@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title><!-- SLOT: ticket number + short title --></title>
+<!--
+  Session guide template. Copy, then fill every SLOT and repeat every REPEAT block.
+  Keep the CSS and the script as they are. HTML-escape all code: < becomes &lt;, > becomes &gt;, & becomes &amp;.
+  Navigation works by data-p="<id>" on a nav link matching id="p-<id>" on a panel.
+-->
+<style>
+:root {
+  color-scheme: light dark;
+  --sans: Geist, Inter, system-ui, sans-serif;
+  --mono: "Geist Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --bg: oklch(97% 0.012 260); --fg: oklch(25% 0.03 265); --muted: oklch(55% 0.03 265);
+  --line: oklch(91% 0.015 265); --card: oklch(100% 0 0); --code-bg: oklch(97% 0.01 265);
+  --accent: oklch(58% 0.2 265);
+  --add-bg: oklch(94% 0.06 160); --add-fg: oklch(45% 0.13 160);
+  --del-bg: oklch(94% 0.05 20); --del-fg: oklch(52% 0.18 20);
+  --warn: oklch(60% 0.15 55); --warn-bg: oklch(95% 0.05 75);
+  --ok: oklch(50% 0.13 160); --ok-bg: oklch(94% 0.06 160);
+  --shadow: 0 12px 40px oklch(40% 0.05 265 / .1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: oklch(17% 0.015 265); --fg: oklch(94% 0.01 265); --muted: oklch(68% 0.02 265);
+    --line: oklch(30% 0.02 265); --card: oklch(21% 0.018 265); --code-bg: oklch(15% 0.015 265);
+    --accent: oklch(72% 0.16 265);
+    --add-bg: oklch(32% 0.07 160 / .6); --add-fg: oklch(84% 0.14 160);
+    --del-bg: oklch(32% 0.08 20 / .6); --del-fg: oklch(80% 0.14 20);
+    --warn: oklch(84% 0.13 70); --warn-bg: oklch(32% 0.06 70 / .6);
+    --ok: oklch(84% 0.14 160); --ok-bg: oklch(32% 0.07 160 / .6);
+    --shadow: 0 12px 40px oklch(0% 0 0 / .35);
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+code, pre { font: 12.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
+code { background: var(--code-bg); padding: 1px 4px; border-radius: 4px; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
+pre code { background: none; padding: 0; }
+a { color: var(--accent); }
+h1 { font-size: 22px; margin: 0 0 8px; } h2 { font-size: 16px; margin: 28px 0 8px; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.diff .add { background: var(--add-bg); color: var(--add-fg); display: block; }
+.diff .del { background: var(--del-bg); color: var(--del-fg); display: block; }
+.diff .ctx { display: block; }
+.loc { font: 12px ui-monospace, Menlo, monospace; color: var(--accent); }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; margin-right: 4px; vertical-align: 1px; }
+.one-way { background: var(--del-bg); color: var(--del-fg); } .two-way { background: var(--ok-bg); color: var(--ok); }
+.agent { background: var(--warn-bg); color: var(--warn); } .user { background: var(--code-bg); color: var(--muted); }
+.mermaid { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+
+.shell { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+nav { border-right: 1px solid var(--line); padding: 20px 14px; position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--card); }
+nav h4 { margin: 18px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+nav .list { font: 12.5px/1.9 ui-monospace, Menlo, monospace; white-space: pre; }
+nav .list a { text-decoration: none; color: var(--fg); border-radius: 4px; padding: 1px 4px; cursor: pointer; }
+nav .list a.on { background: var(--accent); color: #fff; }
+nav .chg, nav .rev { color: var(--warn); }
+main { padding: 24px 28px; max-width: 920px; }
+.panel { display: none; } .panel.on { display: block; }
+.stop { border-left: 3px solid var(--line); padding: 2px 0 2px 16px; margin: 22px 0; }
+.stop.review { border-left-color: var(--warn); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.tabs { display: flex; gap: 6px; margin: 14px 0; flex-wrap: wrap; }
+.tabs button { border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 99px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+.tabs button.on { background: var(--fg); color: var(--bg); }
+
+
+/* where we are: C4-style containers, touched components highlighted */
+.c4 { display: grid; gap: 8px; margin: 12px 0 6px; }
+.c4-row { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; }
+.c4-person { justify-self: start; border: 1px solid var(--line); border-radius: 99px; padding: 5px 14px; font-size: 13px; background: var(--card); }
+.c4-box { flex: 1 1 0; min-width: 170px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 9px 11px; opacity: .55; }
+.c4-box.hit { opacity: 1; border: 2px solid var(--accent); }
+.c4-box.ext { border-style: dashed; }
+.c4-box.db { border-radius: 10px 10px 18px 18px; }
+.c4-head b { display: block; font-size: 13px; } .c4-head small { color: var(--muted); font-size: 11px; }
+.c4-comps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.c4-comp { font: 11px ui-monospace, Menlo, monospace; padding: 2px 7px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+.c4-comp.hit { background: var(--accent); border-color: var(--accent); color: #fff; }
+.c4-comp[data-p] { cursor: pointer; }
+.c4-link { flex: 0 0 auto; align-self: center; padding: 0 8px; font-size: 10px; color: var(--muted); text-align: center; line-height: 1.3; }
+.c4-link::after { content: "⟷"; display: block; font-size: 16px; }
+.c4-down { font-size: 10px; color: var(--muted); padding-left: 12px; }
+@media (max-width: 700px) { .c4-row { flex-direction: column; } .c4-link::after { content: "↕"; } }
+
+/* pseudocode first, the real hunk folded underneath */
+pre.pseudo { border-left: 3px solid var(--accent); background: var(--card); border-top: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+details.hunk { margin: 6px 0 12px; } details.hunk summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+details.hunk[open] summary { margin-bottom: 4px; }
+
+
+/* shape table: a big contract compared member by member */
+.shape { margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+.shape-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.shape-head b { font-family: ui-monospace, Menlo, monospace; }
+.shape-sum span { margin-left: 8px; font-size: 12px; }
+.shape table { width: 100%; border-collapse: collapse; font: 12px ui-monospace, Menlo, monospace; }
+.shape th { text-align: left; font: 600 11px -apple-system, sans-serif; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 12px; }
+.shape td { padding: 5px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+.shape td.st { width: 1%; white-space: nowrap; text-align: center; font-family: -apple-system, sans-serif; font-size: 11px; font-weight: 600; }
+.shape .t { color: var(--muted); }
+.shape tr.added td.after, .shape tr.added td.st { background: var(--add-bg); color: var(--add-fg); }
+.shape tr.removed td.before, .shape tr.removed td.st { background: var(--del-bg); color: var(--del-fg); }
+.shape tr.changed td.st, .shape tr.changed .diffpart { background: var(--warn-bg); color: var(--warn); }
+.shape tr.renamed td.st { color: var(--accent); }
+.shape tr.same td { color: var(--muted); }
+.shape td.note { font-family: -apple-system, sans-serif; color: var(--muted); }
+.shape.hide-same tr.same { display: none; }
+.shape-toggle { font-size: 12px; color: var(--accent); cursor: pointer; background: none; border: 0; padding: 0; }
+
+/* change map: files by layer, sized by lines changed */
+.map { display: grid; gap: 8px; margin: 12px 0; }
+.layer { display: grid; grid-template-columns: 130px 1fr; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.layer-name { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding-top: 5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; flex-direction: column; gap: 3px; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); font: 12px ui-monospace, Menlo, monospace; color: var(--fg); text-decoration: none; cursor: default; }
+.chip[data-p] { cursor: pointer; } .chip[data-p]:hover { border-color: var(--accent); }
+.chip.new { border-color: var(--add-fg); } .chip.new b::before { content: "+ "; color: var(--add-fg); }
+.chip.gone { opacity: .7; } .chip.gone b::before { content: "− "; color: var(--del-fg); }
+.chip.review { box-shadow: inset 3px 0 0 var(--warn); }
+.chip .bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; }
+.chip .bar i { display: block; height: 100%; } .chip .bar .a { background: var(--add-fg); } .chip .bar .d { background: var(--del-fg); }
+.chip .n { color: var(--muted); font-size: 11px; }
+@media (max-width: 600px) { .layer { grid-template-columns: 1fr; } }
+
+/* flow: the walkthrough as a chain of boxes, built from the nav */
+.flow { margin: 12px 0 18px; }
+.flow-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.flow-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow-box { padding: 7px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); font: 12px ui-monospace, Menlo, monospace; cursor: pointer; color: var(--fg); }
+.flow-box small { display: block; color: var(--muted); font-size: 10px; }
+.flow-box.chg { background: var(--add-bg); border-color: var(--add-fg); }
+.flow-box.rev { border: 2px solid var(--warn); }
+.flow-arrow { color: var(--muted); }
+
+/* decision grid: door x who, built from the decision panels */
+.dgrid { display: grid; grid-template-columns: 80px 1fr 1fr; gap: 6px; margin: 12px 0; font-size: 13px; }
+.dgrid .h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); align-self: end; }
+.dgrid .cell { min-height: 64px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); padding: 8px; display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; }
+.dgrid .cell.hot { background: var(--warn-bg); border-color: var(--warn); }
+.dgrid .cell .tag { font-size: 10px; color: var(--muted); width: 100%; }
+.dgrid a { background: var(--bg); border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; cursor: pointer; color: var(--fg); text-decoration: none; }
+.dgrid .rh { align-self: center; }
+.dgrid a:hover { border-color: var(--accent); }
+
+/* timeline: before/after on a date axis */
+.timeline svg { width: 100%; height: auto; display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.timeline text { font: 11px -apple-system, sans-serif; fill: var(--fg); }
+.timeline .muted-t { fill: var(--muted); }
+.timeline .axis { stroke: var(--line); stroke-width: 2; }
+.timeline .ok { fill: var(--ok); stroke: var(--ok); } .timeline .bad { fill: var(--del-fg); stroke: var(--del-fg); }
+.timeline .neutral { fill: var(--muted); stroke: var(--muted); } .timeline .now { stroke: var(--accent); stroke-dasharray: 4 3; }
+.timeline .span { fill: none; stroke-width: 1.5; }
+@media (max-width: 800px) { .shell { grid-template-columns: 1fr; } nav { position: static; height: auto; } main { padding: 20px 16px; } }
+
+/* ---------- theme: Bento, large ---------- */
+body {
+  font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(600px 400px at 10% 0%, color-mix(in oklch, oklch(70% 0.12 300) 22%, transparent), transparent 70%),
+    radial-gradient(700px 500px at 100% 30%, color-mix(in oklch, oklch(72% 0.1 200) 22%, transparent), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+code, pre { font-family: var(--mono); font-size: 13.5px; }
+.shell { grid-template-columns: 330px 1fr; gap: 18px; padding: 18px; }
+nav { border: 1px solid var(--line); border-radius: 22px; height: calc(100vh - 36px); top: 18px; box-shadow: var(--shadow); padding: 26px 20px; }
+nav > div:first-child { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; }
+nav > .muted { font-size: 13px; margin-top: 4px; }
+nav h4 { font-size: 12px; margin-top: 26px; }
+nav .list { font: 500 15px/2.1 var(--sans); }
+nav .list a { padding: 3px 8px; border-radius: 8px; }
+nav .list a.on { background: var(--fg); color: var(--bg); }
+main { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 44px 52px; box-shadow: var(--shadow); max-width: none; }
+h1 { font-size: 40px; font-weight: 720; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 14px; text-wrap: balance; }
+h2 { display: flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 680; letter-spacing: -0.025em; margin: 48px 0 14px; }
+h2::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--accent); flex: none; }
+main p, main li { max-width: 72ch; text-wrap: pretty; }
+.small { font-size: 14.5px; }
+.loc { font: 500 13px var(--mono); }
+:is(.card, .layer, .shape, .c4-box, .dgrid .cell, .timeline svg, .mermaid, pre) { border-radius: 18px; border-color: var(--line); }
+.layer { background: color-mix(in oklch, var(--accent) 3%, var(--card)); grid-template-columns: 150px 1fr; padding: 14px 16px; }
+.chip { font: 500 14px var(--sans); padding: 8px 12px; gap: 5px; border-radius: 12px; }
+.chip .n { font-size: 12px; }
+.layer-name, .dgrid .h, .shape th { font-size: 12.5px; }
+.flow-box { font: 500 14.5px var(--sans); padding: 10px 14px; border-radius: 12px; }
+.flow-box small { font-size: 11.5px; } .flow-title { font-size: 14px; }
+.c4-head b { font-size: 16px; } .c4-head small { font-size: 13px; }
+.c4-comp { font: 500 13px var(--sans); padding: 3px 9px; }
+.c4-box { padding: 14px 16px; } .c4-link { font-size: 12px; }
+.dgrid { font-size: 15px; grid-template-columns: 100px 1fr 1fr; }
+.dgrid a { padding: 5px 12px; border-radius: 12px; }
+.badge { font-size: 12.5px; padding: 3px 10px; }
+.card { font-size: 15.5px; padding: 16px 18px; }
+.shape table { font-size: 13.5px; } .shape td { padding: 8px 14px; } .shape-head { font-size: 15px; padding: 12px 16px; }
+.timeline text { font: 13px var(--sans); }
+.tabs button { font-size: 14px; padding: 6px 14px; }
+details.hunk summary { font-size: 14px; }
+:is(.chip, .flow-box, .dgrid a) { transition: translate .15s, box-shadow .15s; }
+:is(.chip[data-p], .flow-box, .dgrid a):hover { translate: 0 -2px; box-shadow: 0 6px 16px oklch(40% 0.08 265 / .15); }
+/* a decision panel whose door is one-way gets a red rule above its title */
+.panel:has(> .badge.one-way) h1 { border-top: 4px solid var(--del-fg); padding-top: 10px; }
+/* the before/after cards stack when their own box is narrow */
+.cards { container-type: inline-size; }
+@container (max-width: 520px) { .card { grid-column: 1 / -1; } }
+@media (max-width: 800px) { .shell { padding: 10px; gap: 10px; } nav { height: auto; } main { padding: 24px 18px; } h1 { font-size: 30px; } }
+
+
+/* ---------- refactoring: lineage, where-did-it-go, changed in transit, before/after ---------- */
+.lineage { margin: 14px 0; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px; overflow-x: auto; }
+.lineage svg { width: 100%; min-width: 640px; height: auto; display: block; }
+.lineage text { font: 13px var(--sans); fill: var(--fg); }
+.lineage .col-h { font-size: 12px; font-weight: 650; fill: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.lineage .grp { font-size: 11px; fill: var(--muted); }
+.lineage .node rect { fill: var(--bg); stroke: var(--line); }
+.lineage .node.gone rect { fill: var(--del-bg); stroke: var(--del-fg); }
+.lineage .node.new rect { fill: var(--add-bg); stroke: var(--add-fg); }
+.lineage .node.review rect { stroke: var(--warn); stroke-width: 2.5; }
+.lineage .node[data-p] { cursor: pointer; }
+.lineage .node.gone text.mark { fill: var(--del-fg); } .lineage .node.new text.mark { fill: var(--add-fg); }
+.lineage path.link { fill: none; stroke-width: 2.5; opacity: .75; }
+.lineage path.link.moved, .lineage path.link.kept { stroke: var(--muted); } .lineage path.link.renamed { stroke: var(--accent); }
+.lineage path.link.merged { stroke: oklch(60% 0.15 300); } .lineage path.link.split { stroke: oklch(62% 0.13 200); }
+.lineage path.link.rewritten { stroke: var(--warn); }
+.lineage path.link.agent { stroke-dasharray: 6 4; }
+.lineage .sim { font-size: 11px; fill: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin: 6px 4px 0; }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top-style: dashed; }
+
+table.whereto { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin: 12px 0; }
+.whereto th { text-align: left; font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 10px 14px; background: var(--code-bg); }
+.whereto td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+.whereto td code { font-size: 12.5px; }
+.how { display: inline-block; font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+.how.moved { background: var(--code-bg); color: var(--muted); } .how.merged { background: color-mix(in oklch, oklch(60% 0.15 300) 14%, transparent); color: oklch(55% 0.15 300); }
+.how.rewritten { background: var(--warn-bg); color: var(--warn); } .how.deleted { background: var(--del-bg); color: var(--del-fg); }
+.how.derived { background: color-mix(in oklch, var(--accent) 12%, transparent); color: var(--accent); } .how.new { background: var(--add-bg); color: var(--add-fg); }
+
+.transit { border: 1px solid var(--line); border-radius: 18px; background: var(--card); padding: 14px 16px; margin: 14px 0; }
+.transit-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font: 500 14px var(--mono); }
+.transit-head .arrow { color: var(--muted); font-family: var(--sans); }
+.transit-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.transit-pair > div h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.transit-pair pre { margin: 0; font-size: 12.5px; }
+.transit-pair mark { background: var(--warn-bg); color: inherit; border-radius: 3px; padding: 0 2px; }
+.transit.unchanged .transit-pair { display: none; }
+
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ba > div > h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ba .c4-row { flex-direction: column; } .ba .c4-link::after { content: "↕"; }
+@media (max-width: 900px) { .ba, .transit-pair { grid-template-columns: 1fr; } }
+
+
+/* ---------- merge request: size, ship/show/ask, reading order, split plan, since last review, MR text ---------- */
+.mr-strip { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; margin: 14px 0; }
+.mr-strip > div { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+.mr-strip .ssa { min-width: 180px; }
+.mr-strip .sizebox { flex: 1 1 380px; }
+.mr-strip h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ssa-badge { display: inline-block; font-size: 22px; font-weight: 750; letter-spacing: -0.02em; }
+.ssa-badge.ship { color: var(--ok); } .ssa-badge.show { color: var(--accent); } .ssa-badge.ask { color: var(--warn); }
+.size-bar { position: relative; display: flex; height: 14px; border-radius: 99px; overflow: hidden; background: var(--code-bg); margin: 8px 0 22px; }
+.size-bar i { display: block; height: 100%; }
+.size-bar .read { background: var(--accent); } .size-bar .skim { background: color-mix(in oklch, var(--accent) 35%, var(--card)); }
+.size-bar .skip { background: var(--line); }
+.size-budget { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--del-fg); }
+.size-budget span { position: absolute; top: 20px; left: -40px; width: 80px; text-align: center; font-size: 11px; color: var(--del-fg); }
+.size-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); }
+.size-legend b { color: var(--fg); }
+.size-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+ol.readorder { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; counter-reset: ro; }
+ol.readorder li { counter-increment: ro; display: grid; grid-template-columns: 34px 64px 1fr; gap: 10px; align-items: start; max-width: none;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+ol.readorder li::before { content: counter(ro); font-weight: 700; color: var(--muted); font-size: 15px; }
+ol.readorder li > div { min-width: 0; } ol.readorder li code { font-size: 12.5px; }
+ol.readorder li .why { color: var(--muted); font-size: 14px; }
+.tier { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 3px 0; border-radius: 99px; text-align: center; }
+.tier.read { background: var(--accent); color: #fff; } .tier.skim { background: color-mix(in oklch, var(--accent) 18%, var(--card)); color: var(--accent); }
+.tier.skip { background: var(--code-bg); color: var(--muted); }
+ol.readorder li.skip { opacity: .7; }
+
+.split { display: grid; gap: 0; margin: 14px 0; }
+.split-mr { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 18px; position: relative; }
+.split-mr + .split-mr { margin-top: 26px; }
+.split-mr + .split-mr::before { content: "then"; position: absolute; top: -22px; left: 24px; font-size: 12px; color: var(--muted); }
+.split-mr.warn { border-color: var(--warn); box-shadow: inset 4px 0 0 var(--warn); }
+.split-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; }
+.split-head h3 { margin: 0; font-size: 18px; letter-spacing: -0.02em; flex: 1 1 260px; }
+.split-head .n { font: 600 13px var(--mono); color: var(--muted); }
+.split-mr ul { margin: 8px 0 0; padding-left: 18px; font-size: 14.5px; }
+.kind { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; padding: 2px 9px; border-radius: 99px; }
+.kind.refactor { background: var(--code-bg); color: var(--muted); } .kind.new { background: var(--add-bg); color: var(--add-fg); }
+.kind.behaviour { background: var(--warn-bg); color: var(--warn); }
+
+.since { display: grid; gap: 8px; margin: 12px 0; }
+.since-row { display: grid; grid-template-columns: 90px 90px 1fr; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; font-size: 14.5px; }
+.since-row code { font-size: 12.5px; }
+.since-st { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; text-align: center; padding: 3px 0; border-radius: 99px; }
+.since-st.same { background: var(--code-bg); color: var(--muted); } .since-st.changed { background: var(--warn-bg); color: var(--warn); }
+.since-st.added { background: var(--add-bg); color: var(--add-fg); } .since-st.dropped { background: var(--del-bg); color: var(--del-fg); }
+.since-row.same { opacity: .65; }
+.findings { display: grid; gap: 8px; margin: 12px 0; }
+.finding { display: grid; grid-template-columns: 26px 1fr; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; font-size: 15px; }
+.finding::before { content: "✓"; color: var(--ok); font-weight: 800; }
+.finding.open::before { content: "○"; color: var(--warn); }
+
+.mrtext { position: relative; }
+.mrtext pre { white-space: pre-wrap; font-size: 13px; max-height: 70vh; overflow: auto; }
+.copy { position: absolute; top: 10px; right: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 10px; padding: 6px 12px; font: 600 13px var(--sans); cursor: pointer; }
+
+/* ---------- review cards: one block per point, with its proof ---------- */
+.rv-summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 18px; font-size: 14px; }
+.rv-summary .pill { padding: 4px 12px; border-radius: 99px; font-weight: 600; background: var(--code-bg); }
+.rv-summary .high { background: var(--del-bg); color: var(--del-fg); }
+.rv-summary .med { background: var(--warn-bg); color: var(--warn); }
+.rv-summary .ok { background: var(--ok-bg); color: var(--ok); }
+.rv { --sev: var(--muted); position: relative; background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--sev);
+  border-radius: 18px; padding: 18px 22px; margin: 16px 0; box-shadow: var(--shadow); }
+.rv[data-sev="high"] { --sev: var(--del-fg); } .rv[data-sev="med"] { --sev: var(--warn); }
+.rv[data-sev="low"] { --sev: var(--muted); } .rv[data-sev="ok"] { --sev: var(--ok); }
+.rv-head { display: flex; align-items: flex-start; gap: 12px; }
+.rv-head input { width: 20px; height: 20px; margin-top: 4px; accent-color: var(--accent); flex: none; cursor: pointer; }
+.rv-head h3 { margin: 0; font-size: 19px; font-weight: 680; letter-spacing: -0.02em; line-height: 1.3; flex: 1; }
+.rv-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 32px; }
+.rv-tag { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .05em; padding: 2px 9px; border-radius: 99px;
+  color: var(--sev); background: color-mix(in oklch, var(--sev) 12%, transparent); }
+.rv-body { margin-left: 32px; }
+.rv-body > p { margin: 10px 0; }
+.rv-vs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+.rv-vs > div { border-radius: 14px; padding: 12px 14px; background: var(--code-bg); border: 1px solid var(--line); font-size: 14.5px; }
+.rv-vs h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.rv-vs .says { border-top: 3px solid var(--accent); } .rv-vs .does { border-top: 3px solid var(--sev); }
+.rv-vs pre { margin: 6px 0 0; padding: 8px 10px; font-size: 12.5px; background: var(--card); }
+.rv-steps { counter-reset: st; list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 6px; }
+.rv-steps li { counter-increment: st; position: relative; padding-left: 38px; min-height: 26px; font-size: 15px; max-width: none; }
+.rv-steps li::before { content: counter(st); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; background: var(--code-bg); border: 1px solid var(--line); }
+.rv-steps li.bad::before { background: var(--del-bg); color: var(--del-fg); border-color: var(--del-fg); }
+.rv-steps li.good::before { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+.rv-ask { margin-top: 12px; padding: 10px 14px; border-radius: 14px; font-size: 15px;
+  background: color-mix(in oklch, var(--accent) 8%, var(--card)); border: 1px solid color-mix(in oklch, var(--accent) 25%, var(--line)); }
+.rv-ask b { color: var(--accent); }
+.rv-links { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.rv-links a { cursor: pointer; }
+.rv.done { opacity: .55; } .rv.done h3 { text-decoration: line-through; }
+@media (max-width: 700px) { .rv-vs { grid-template-columns: 1fr; } .rv-body, .rv-tags { margin-left: 0; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav>
+    <div style="font-weight:600"><!-- SLOT: ticket number + short title --></div>
+    <div class="muted small"><!-- SLOT: ADR refs · branch · last updated YYYY-MM-DD --></div>
+
+    <h4>Overview</h4>
+    <div class="list"><a data-p="overview" class="on">Context &amp; shape</a>
+<a data-p="contracts">Contracts (<!-- SLOT: count -->)</a>
+<a data-p="review">Review this (<!-- SLOT: count -->)</a></div>
+
+    <h4>Walkthrough: <!-- SLOT: the request being followed --></h4>
+    <!-- One link per stop, indented as the call tree. ● = changed, ! = review. One flow per list; add a second h4 + list for a second flow. -->
+    <div class="list"><a data-p="w1">1 EntryPoint</a>
+<a data-p="w2">  2 changedMethod <span class="chg">●</span><span class="rev">!</span></a></div>
+
+    <!-- Merge request: always the first three; Split plan only when the read lines exceed the budget or the MR
+         mixes refactoring with behaviour; Since last review only once a version was marked reviewed. -->
+    <h4>Merge request</h4>
+    <div class="list"><a data-p="readorder">Read in this order</a>
+<a data-p="split">Split plan</a>
+<a data-p="since">Since last review</a>
+<a data-p="mr">MR description</a></div>
+
+    <!-- Refactoring only: when files were deleted, created, renamed, split or merged. -->
+    <h4>Refactoring</h4>
+    <div class="list"><a data-p="lineage">Lineage</a>
+<a data-p="transit">Changed in transit (<!-- SLOT -->)</a>
+<a data-p="behaviour">Behaviour</a></div>
+
+    <h4>Decisions</h4>
+    <div class="list"><a data-p="d1">1 <!-- SLOT: short decision name --></a></div>
+
+    <p class="small muted" style="margin-top:14px"><span class="chg">●</span> changed &nbsp; <span class="rev">!</span> review this</p>
+  </nav>
+
+  <main>
+    <div class="panel on" id="p-overview">
+      <h1><!-- SLOT: title --></h1>
+      <p><!-- SLOT: Context — the problem in the user's terms, why now --></p>
+      <p class="small muted">Out of scope: <!-- SLOT --></p>
+
+      <!-- Ship / Show / Ask, and the effective review size in lines: read (logic), skim (tests, DTOs, config),
+           skip (moved unchanged, generated, deleted — check the list, not the lines). -->
+      <div class="mr-strip">
+        <div class="ssa"><h4>Ship · Show · Ask</h4><span class="ssa-badge ask">Ask</span><div class="small muted"><!-- SLOT: why --></div></div>
+        <div class="sizebox" data-read="0" data-skim="0" data-skip="0" data-budget="400"><h4>Review size</h4></div>
+      </div>
+
+      <h2>Where we are</h2>
+      <!-- SLOT: the system as it stood at this commit, C4 level 2 with the components inside each container.
+           Take it from the repo's architecture doc (else the directory layout), at this commit. Class "hit" on every
+           container and component this change touches; data-p links a component to its stop or decision.
+           Main row: the request path, joined by .c4-link labels. Second row: stores and external systems (.db, .ext). -->
+      <div class="c4">
+        <div class="c4-person">You · phone / laptop</div>
+        <div class="c4-row">
+          <div class="c4-box hit"><div class="c4-head"><b>Container</b><small>technology</small></div>
+            <div class="c4-comps"><span class="c4-comp hit" data-p="w1">component</span><span class="c4-comp">other</span></div></div>
+          <span class="c4-link">protocol</span>
+          <div class="c4-box"><div class="c4-head"><b>Container</b><small>technology</small></div></div>
+        </div>
+        <div class="c4-row">
+          <div class="c4-box db"><div class="c4-head"><b>Store</b><small>technology</small></div></div>
+          <span class="c4-link"></span>
+          <div class="c4-box ext"><div class="c4-head"><b>External system</b><small>role</small></div></div>
+        </div>
+      </div>
+
+      <h2>Shape of the change</h2>
+      <!-- Walkthrough chain and decision grid are drawn automatically from the nav and the decision panels. -->
+      <div class="auto-flow"></div>
+      <!-- SLOT: change map — one .layer per layer that changed (UI, API, domain, persistence, migration,
+           shared fixtures, tests, docs). One .chip per file; add class "new" for added files and
+           "review" for files with a review item; data-p links to the stop or decision that explains it.
+           Group many trivial files into one chip ("fold-fixtures 01–14", summed counts). -->
+      <div class="map">
+        <div class="layer"><div class="layer-name">Domain</div><div class="chips">
+          <a class="chip" data-p="w2" data-add="0" data-del="0"><b>File.java</b></a>
+        </div></div>
+      </div>
+      <!-- SLOT: a call-tree diff of the changed flow (smallest view that shows it). -->
+      <pre class="diff"><code></code></pre>
+      <!-- SLOT: file tree of EVERY changed file, one line each, +/- for added/removed files. -->
+      <pre class="diff"><code></code></pre>
+
+      <h2>Decisions at a glance</h2>
+      <div class="auto-decisions"></div>
+
+      <h2>Evidence</h2>
+      <!-- SLOT, when time or dates matter: a before/after timeline. Events: date (YYYY-MM-DD), text, tone ok|bad|neutral.
+           Spans: from, to, text, tone. data-now draws a "today" line. Otherwise a Mermaid state or sequence diagram, or a screenshot. -->
+      <div class="timeline" data-now="" data-rows='[{"label":"Before","events":[],"spans":[]},{"label":"After","events":[],"spans":[]}]'></div>
+      <div class="cards">
+        <div class="card"><b>Before</b><pre><code><!-- SLOT --></code></pre></div>
+        <div class="card"><b>After</b><pre><code><!-- SLOT --></code></pre></div>
+      </div>
+      <p class="small">Not covered: <!-- SLOT --></p>
+
+      <h2>Merge danger</h2>
+      <p><span class="badge one-way">one-way door</span><!-- or two-way --> <!-- SLOT: why --> <b>Blast radius:</b> <!-- SLOT --></p>
+
+      <h2>Sessions</h2>
+      <ul class="small"><li><!-- SLOT: YYYY-MM-DD — one line --></li></ul>
+    </div>
+
+    <!-- Contracts: only changed signatures, types, endpoints, events, schema — no bodies. Read first by a reviewer. -->
+    <div class="panel" id="p-contracts">
+      <h1>Contracts</h1>
+      <p class="muted small">What callers see change. Bodies are in the walkthrough.</p>
+      <!-- REPEAT per changed contract -->
+      <div class="stop">
+        <div class="loc"><!-- SLOT: path:line --></div>
+        <p><!-- SLOT: who depends on it --></p>
+        <pre class="diff"><code><!-- SLOT: signature or type diff only --></code></pre>
+        <!-- A big contract (more than three members changed, or lines too long to compare by eye) gets a shape table
+             instead, with the raw diff folded underneath:
+        <div class="shape" data-name="TypeName" data-before='[["field","Type"]]'
+             data-after='[["field","NewType"],{"n":"renamed","t":"Type","was":"old","note":"why"}]'></div>
+        <details class="hunk"><summary>The raw diff</summary><pre class="diff"><code>…</code></pre></details> -->
+      </div>
+    </div>
+
+    <div class="panel" id="p-review">
+      <h1>Review this</h1>
+      <!-- The summary line fills itself from the cards below. -->
+      <div class="rv-summary"></div>
+
+      <!-- REPEAT per point, most severe first. data-sev: high | med | low | ok (checked, holds).
+           Tags: the kind (doc ≠ code, race, untested, one-way door, agent default, drift) — each a .rv-tag.
+           Proof, the smallest that convinces — use one or more:
+             .rv-vs      what the docs/comment/test claim beside what the code does
+             .rv-steps   a concrete scenario, step by step; li.bad / li.good mark the turn
+             a hunk      <div class="loc"> + <pre class="diff">, or a query or command that settles it
+           End on .rv-ask: the decision or check that is the user's. -->
+      <div class="rv" id="rv1" data-sev="high">
+        <div class="rv-head"><input type="checkbox" aria-label="Reviewed"><h3><!-- SLOT: the point, as a claim --></h3></div>
+        <div class="rv-tags"><span class="rv-tag"><!-- SLOT: kind --></span></div>
+        <div class="rv-body">
+          <p><!-- SLOT: why it matters, in one or two sentences --></p>
+          <div class="rv-vs">
+            <div class="says"><h4><!-- SLOT: The docs say --></h4><!-- SLOT --></div>
+            <div class="does"><h4><!-- SLOT: The code does --></h4><!-- SLOT --></div>
+          </div>
+          <ol class="rv-steps"><li><!-- SLOT --></li><li class="bad"><!-- SLOT: where it goes wrong --></li></ol>
+          <div class="rv-ask"><b>Decide:</b> <!-- SLOT --></div>
+          <div class="rv-links">See <a data-p="w1">stop 1</a></div>
+        </div>
+      </div>
+
+      <h2>Dead ends and surprises</h2>
+      <ul><li><!-- SLOT --></li></ul>
+    </div>
+
+    <!-- REPEAT per walkthrough stop. A stop flagged review uses the tabs variant below instead. -->
+    <div class="panel" id="p-w1">
+      <div class="loc"><!-- SLOT: path:line --></div>
+      <h1><!-- SLOT: 1 · what this stop is --></h1>
+      <p><!-- SLOT: what happens here and why it is shaped this way --></p>
+      <!-- Logic: pseudocode first, the real hunk folded underneath. Trivial or mechanical: the hunk alone, open.
+           State that matters (statuses, answers, modes): a Mermaid stateDiagram-v2 in <div class="mermaid">. -->
+      <pre class="pseudo"><code><!-- SLOT: pseudocode, diff markers allowed --></code></pre>
+      <details class="hunk"><summary>The real change · <!-- SLOT: path:line --></summary><pre class="diff"><code><!-- SLOT --></code></pre></details>
+    </div>
+
+    <!-- Review stop variant: Diff / Why / Alternatives tabs. -->
+    <div class="panel" id="p-w2">
+      <div class="loc"><!-- SLOT: path:line --></div>
+      <h1><!-- SLOT --> <span class="badge agent">review</span></h1>
+      <div class="tabs"><button class="on" data-t="diff">Diff</button><button data-t="why">Why</button><button data-t="alt">Alternatives</button></div>
+      <div data-tab="diff"><pre class="diff"><code></code></pre></div>
+      <div data-tab="why" hidden><p></p></div>
+      <div data-tab="alt" hidden><p></p></div>
+    </div>
+
+    <div class="panel" id="p-readorder">
+      <h1>Read in this order</h1>
+      <!-- REPEAT, in the order a reviewer should go: tier read | skim | skip, the files, why at this point. -->
+      <ol class="readorder">
+        <li><span class="tier read">read</span><div><code><!-- SLOT: files --></code><div class="why"><!-- SLOT --></div></div></li>
+      </ol>
+    </div>
+
+    <div class="panel" id="p-split">
+      <h1>Split plan</h1>
+      <!-- REPEAT per proposed MR, in safe merge order. kind: refactor | new | behaviour. Class "warn" on an MR that must
+           not merge alone (say what it must travel with). -->
+      <div class="split">
+        <div class="split-mr"><div class="split-head"><span class="n">MR 1</span><h3><!-- SLOT --></h3><span class="kind new">new code</span><span class="badge two-way">Show</span><span class="n">~0 read</span></div>
+          <ul><li><!-- SLOT --></li></ul></div>
+      </div>
+    </div>
+
+    <!-- Since last review: git range-diff <base>..<reviewed> <base>..HEAD, plus the findings each change answers. -->
+    <div class="panel" id="p-since">
+      <h1>Since last review</h1>
+      <div class="since">
+        <div class="since-row"><span class="since-st same">unchanged</span><code><!-- SLOT: sha --></code><span><!-- SLOT: subject --></span></div>
+      </div>
+      <div class="findings"><div class="finding"><span><!-- SLOT: finding → where it is answered --></span></div></div>
+    </div>
+
+    <div class="panel" id="p-mr">
+      <h1>MR description</h1>
+      <p class="small muted">Also written to <code><!-- SLOT: path --></code>. Paste it into the merge request.</p>
+      <div class="mrtext"><button class="copy">Copy</button><pre><code><!-- SLOT: the Markdown --></code></pre></div>
+    </div>
+
+    <!-- Refactoring panels. Lineage: every old file on the left, every new one on the right. A link git detects
+         (git diff -M -C --name-status, with its similarity) is by "git"; one only the session knows is by "agent".
+         An old file with no link is drawn deleted; a new one with no link is drawn new. -->
+    <div class="panel" id="p-lineage">
+      <h1>Lineage</h1>
+      <div class="lineage" data-old='[{"n":"Old.java","g":"package"}]' data-new='[{"n":"New.java","g":"package","p":"w1"}]'
+           data-links='[{"from":["Old.java"],"to":["New.java"],"kind":"renamed","sim":97,"by":"git"}]'></div>
+      <h2>Where did it go</h2>
+      <!-- One row per responsibility, not per file. how: moved | merged | rewritten | deleted | derived | new -->
+      <table class="whereto"><tr><th>Responsibility</th><th>Before</th><th>After</th><th>How</th></tr>
+        <tr><td><!-- SLOT --></td><td><code><!-- SLOT --></code></td><td><code><!-- SLOT --></code></td><td><span class="how moved">moved</span></td></tr>
+      </table>
+    </div>
+
+    <!-- Changed in transit: each moved or merged piece. Class "unchanged" when it moved as-is (one line, no code);
+         otherwise before and after side by side, with the lines that changed meaning wrapped in <mark>. -->
+    <div class="panel" id="p-transit">
+      <h1>Changed in transit</h1>
+      <div class="transit">
+        <div class="transit-head"><span><!-- SLOT: old place --></span><span class="arrow">→</span><span><!-- SLOT: new place --></span><span class="how rewritten">changed</span></div>
+        <p><!-- SLOT: what changed in meaning --></p>
+        <div class="transit-pair"><div><h4>before</h4><pre><code></code></pre></div><div><h4>after</h4><pre><code></code></pre></div></div>
+      </div>
+    </div>
+
+    <!-- Behaviour: a refactoring claims nothing changes. Ledger of what changed on purpose and what must not have;
+         tests as a shape table (before → after, with "was" for a test that moved), deleted tests with no successor flagged. -->
+    <div class="panel" id="p-behaviour">
+      <h1>Behaviour</h1>
+      <table class="whereto"><tr><th>Behaviour</th><th>Before</th><th>After</th><th>Status</th></tr></table>
+      <div class="shape" data-name="Tests" data-before='[]' data-after='[]'></div>
+    </div>
+
+    <!-- REPEAT per decision: the deep dive, a scroll of every hunk that implements it. -->
+    <div class="panel" id="p-d1">
+      <span class="badge two-way">two-way</span><span class="badge agent">agent default</span><!-- or <span class="badge user">you</span> -->
+      <h1><!-- SLOT: decision --></h1>
+      <p><b>Why:</b> <!-- SLOT: the reason from the session --></p>
+      <p><b>Alternatives:</b> <!-- SLOT: each, and why it lost; or "none considered" --></p>
+      <!-- REPEAT per hunk that implements the decision -->
+      <div class="stop">
+        <div class="loc"><!-- SLOT: path:line --></div>
+        <p><!-- SLOT: what this hunk does for the decision --></p>
+        <pre class="diff"><code></code></pre>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+document.querySelectorAll('pre.diff code').forEach(c => {
+  c.innerHTML = c.innerHTML.split('\n').map(l =>
+    `<span class="${l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : 'ctx'}">${l || ' '}</span>`).join('');
+});
+
+
+// shape table: data-before / data-after are lists of [name, type] or {n, t, was, note}; matched by name, or by "was"
+document.querySelectorAll('.shape[data-after]').forEach(el => {
+  const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const norm = m => Array.isArray(m) ? { n: m[0], t: m[1], note: m[2] } : m;
+  const before = JSON.parse(el.dataset.before || '[]').map(norm), after = JSON.parse(el.dataset.after).map(norm);
+  const used = new Set(), rows = [];
+  after.forEach(a => {
+    const b = before.find(x => x.n === (a.was ?? a.n));
+    if (b) used.add(b);
+    const kind = !b ? 'added' : a.was && a.was !== a.n ? 'renamed' : (b.t ?? '') !== (a.t ?? '') ? 'changed' : 'same';
+    rows.push({ kind, b, a, note: a.note ?? b?.note });
+  });
+  before.filter(b => !used.has(b)).forEach(b => rows.push({ kind: 'removed', b, note: b.note }));
+  const label = { added: '+ added', removed: '− removed', changed: '~ type', renamed: '→ renamed', same: '=' };
+  const cell = m => m ? `${esc(m.n)}${m.t ? ` <span class="t">${esc(m.t)}</span>` : ''}` : '';
+  const count = k => rows.filter(r => r.kind === k).length;
+  const sum = ['added', 'changed', 'renamed', 'removed'].filter(count).map(k => `<span>${label[k]} ${count(k)}</span>`).join('') + (count('same') ? `<span class="muted">= ${count('same')}</span>` : '');
+  el.classList.add('hide-same');
+  el.innerHTML = `<div class="shape-head"><b>${esc(el.dataset.name)}</b><span class="shape-sum">${sum}${count('same') ? ' <button class="shape-toggle">show unchanged</button>' : ''}</span></div>
+    <table><tr><th>${esc(el.dataset.beforeLabel || 'before')}</th><th></th><th>${esc(el.dataset.afterLabel || 'after')}</th><th></th></tr>${rows.map(r =>
+      `<tr class="${r.kind}"><td class="before">${cell(r.b)}</td><td class="st">${label[r.kind]}</td><td class="after">${cell(r.a)}</td><td class="note">${esc(r.note)}</td></tr>`).join('')}</table>`;
+  const tg = el.querySelector('.shape-toggle');
+  if (tg) tg.onclick = () => { el.classList.toggle('hide-same'); tg.textContent = el.classList.contains('hide-same') ? 'show unchanged' : 'hide unchanged'; };
+});
+
+// review cards: summary line, and ticks remembered in this browser only
+(() => {
+  const cards = [...document.querySelectorAll('.rv')];
+  if (!cards.length) return;
+  const key = id => `guide:${location.pathname}:${id}`;
+  const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
+                  set: (k, v) => { try { v ? localStorage.setItem(k, '1') : localStorage.removeItem(k); } catch {} } };
+  const summary = () => {
+    const n = sev => cards.filter(c => c.dataset.sev === sev).length;
+    const done = cards.filter(c => c.classList.contains('done')).length;
+    document.querySelectorAll('.rv-summary').forEach(el => el.innerHTML =
+      [['high', 'high'], ['med', 'medium'], ['low', 'low'], ['ok', 'checked, holds']].filter(([s]) => n(s))
+        .map(([s, l]) => `<span class="pill ${s}">${n(s)} ${l}</span>`).join('') + `<span class="muted">${done} of ${cards.length} reviewed</span>`);
+  };
+  cards.forEach(c => {
+    const box = c.querySelector('.rv-head input');
+    if (!box) return;
+    box.checked = !!store.get(key(c.id));
+    c.classList.toggle('done', box.checked);
+    box.onchange = () => { c.classList.toggle('done', box.checked); store.set(key(c.id), box.checked); summary(); };
+  });
+  summary();
+})();
+
+// lineage map: data-old / data-new are [{n, g?, p?, review?}]; data-links are [{from:[..], to:[..], kind, sim?, by:'git'|'agent', note?}]
+document.querySelectorAll('.lineage[data-links]').forEach(el => {
+  const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const olds = JSON.parse(el.dataset.old), news = JSON.parse(el.dataset.new), links = JSON.parse(el.dataset.links);
+  const linkedOld = new Set(links.flatMap(l => l.from)), linkedNew = new Set(links.flatMap(l => l.to));
+  // order the new column by the average position of its sources, so lines cross as little as possible
+  const oi = Object.fromEntries(olds.map((o, i) => [o.n, i]));
+  const weight = n => { const src = links.filter(l => l.to.includes(n)).flatMap(l => l.from).map(f => oi[f]);
+    return src.length ? src.reduce((a, b) => a + b, 0) / src.length : olds.length + 1; };
+  const ordered = [...news].sort((a, b) => weight(a.n) - weight(b.n));
+  const W = 960, NW = 330, NH = 34, GAP = 8, TOP = 34, LX = 0, RX = W - NW;
+  const y = i => TOP + i * (NH + GAP);
+  const pos = {}; olds.forEach((o, i) => pos['o:' + o.n] = y(i)); ordered.forEach((o, i) => pos['n:' + o.n] = y(i));
+  const H = TOP + Math.max(olds.length, ordered.length) * (NH + GAP) + 10;
+  const node = (o, x, side, cls, mark) => `<g class="node ${cls}${o.review ? ' review' : ''}"${o.p ? ` data-p="${o.p}"` : ''}><title>${esc(o.note || o.n)}</title>
+    <rect x="${x}" y="${pos[side + o.n]}" width="${NW}" height="${NH}" rx="9"/>
+    ${o.g ? `<text class="grp" x="${x + 10}" y="${pos[side + o.n] + 13}">${esc(o.g)}</text>` : ''}
+    <text x="${x + 10}" y="${pos[side + o.n] + (o.g ? 27 : 22)}">${esc(o.n)}</text>
+    ${mark ? `<text class="mark" x="${x + NW - 10}" y="${pos[side + o.n] + 22}" text-anchor="end" font-weight="700">${mark}</text>` : ''}</g>`;
+  let svg = `<text class="col-h" x="${LX}" y="18">before</text><text class="col-h" x="${RX}" y="18">after</text>`;
+  links.forEach(l => l.from.forEach(f => l.to.forEach(t => {
+    const y1 = pos['o:' + f] + NH / 2, y2 = pos['n:' + t] + NH / 2, x1 = LX + NW, x2 = RX, mx = (x1 + x2) / 2;
+    svg += `<path class="link ${l.kind} ${l.by === 'agent' ? 'agent' : ''}" d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"><title>${esc(l.kind + (l.sim ? ` · ${l.sim}% similar` : '') + (l.by === 'agent' ? ' · stated by the agent, git sees no link' : ' · detected by git') + (l.note ? ` — ${l.note}` : ''))}</title></path>`;
+    if (l.sim && l.from.length === 1 && l.to.length === 1) svg += `<text class="sim" x="${mx}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${l.sim}%</text>`;
+  })));
+  olds.forEach(o => svg += node(o, LX, 'o:', linkedOld.has(o.n) ? '' : 'gone', linkedOld.has(o.n) ? '' : '✕'));
+  ordered.forEach(o => svg += node(o, RX, 'n:', linkedNew.has(o.n) ? '' : 'new', linkedNew.has(o.n) ? '' : '+'));
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Lineage: where each old file went">${svg}</svg>
+    <div class="legend"><span><i style="border-color:var(--muted)"></i>kept / moved</span><span><i style="border-color:var(--accent)"></i>renamed</span>
+    <span><i style="border-color:oklch(60% 0.15 300)"></i>merged</span><span><i style="border-color:oklch(62% 0.13 200)"></i>split</span>
+    <span><i style="border-color:var(--warn)"></i>rewritten</span><span><i class="dash" style="border-color:var(--muted)"></i>stated by the agent; git sees no link</span>
+    <span>✕ deleted, no successor</span><span>+ new, no predecessor</span></div>`;
+  el.querySelectorAll('.node[data-p]').forEach(n => n.addEventListener('click', () => show(n.dataset.p)));
+});
+
+// review size: data-read / data-skim / data-skip lines, data-budget (default 400)
+document.querySelectorAll('.sizebox[data-read]').forEach(el => {
+  const r = +el.dataset.read, k = +el.dataset.skim, p = +el.dataset.skip, b = +(el.dataset.budget || 400), total = r + k + p;
+  const scale = Math.max(total, b * 1.1), pct = v => (v / scale * 100).toFixed(2) + '%';
+  el.insertAdjacentHTML('beforeend', `<div class="size-bar"><i class="read" style="width:${pct(r)}"></i><i class="skim" style="width:${pct(k)}"></i><i class="skip" style="width:${pct(p)}"></i>
+    <span class="size-budget" style="left:${pct(b)}"><span>budget ${b}</span></span></div>
+    <div class="size-legend"><span><i style="background:var(--accent)"></i><b>${r.toLocaleString()}</b> to read</span><span><i style="background:color-mix(in oklch, var(--accent) 35%, var(--card))"></i><b>${k.toLocaleString()}</b> to skim</span><span><i style="background:var(--line)"></i><b>${p.toLocaleString()}</b> to skip</span><span>· ${r > b ? `<b style="color:var(--del-fg)">${Math.round(r / b * 10) / 10}× the budget</b>, see the <a data-p="split">split plan</a>` : 'within budget'}</span></div>`);
+  el.querySelectorAll('a[data-p]').forEach(a => a.onclick = () => show(a.dataset.p));
+});
+// MR text: copy button
+document.querySelectorAll('.mrtext').forEach(el => {
+  const btn = el.querySelector('.copy'), text = el.querySelector('pre').innerText;
+  if (btn) btn.onclick = async () => { try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; } catch { btn.textContent = 'Select and copy'; } setTimeout(() => btn.textContent = 'Copy', 1500); };
+});
+// change map: draw +/- bars scaled to the largest file
+(() => {
+  const chips = [...document.querySelectorAll('.chip[data-add]')];
+  const max = Math.max(1, ...chips.map(c => +c.dataset.add + +(c.dataset.del || 0)));
+  chips.forEach(c => {
+    const a = +c.dataset.add, d = +(c.dataset.del || 0), w = 90;
+    c.insertAdjacentHTML('beforeend', `<span class="bar" style="width:${Math.max(6, (a + d) / max * w)}px"><i class="a" style="flex:${a}"></i><i class="d" style="flex:${d}"></i></span><span class="n">+${a} −${d}</span>`);
+  });
+})();
+// flow: one chain per "Walkthrough" list in the nav
+document.querySelectorAll('.auto-flow').forEach(box => {
+  document.querySelectorAll('nav h4').forEach(h => {
+    if (!h.textContent.trim().startsWith('Walkthrough')) return;
+    const links = [...h.nextElementSibling.querySelectorAll('a')];
+    const boxes = links.map((a, i) => {
+      const raw = a.textContent.replace(/[●!]/g, '');
+      const depth = raw.match(/^ */)[0].length / 2;
+      const cls = (a.querySelector('.chg') ? ' chg' : '') + (a.querySelector('.rev') ? ' rev' : '');
+      return `<span class="flow-box${cls}" data-p="${a.dataset.p}"><small>${depth ? '↳ '.repeat(depth).trim() : (i ? 'then' : 'entry')}</small>${raw.trim()}</span>`;
+    });
+    box.insertAdjacentHTML('beforeend', `<div class="flow"><div class="flow-title">${h.textContent}</div><div class="flow-row">${boxes.join('<span class="flow-arrow">→</span>')}</div></div>`);
+  });
+});
+// decision grid: door × who, from each decision panel's badges
+document.querySelectorAll('.auto-decisions').forEach(box => {
+  const ds = [...document.querySelectorAll('.panel[id^="p-d"]')].map(p => ({
+    p: p.id.slice(2), t: p.querySelector('h1').textContent.trim(),
+    one: !!p.querySelector('.badge.one-way'), agent: !!p.querySelector('.badge.agent') }));
+  const cell = (one, agent, hot) => `<div class="cell${hot ? ' hot' : ''}">${hot ? '<span class="tag">review hardest</span>' : ''}${
+    ds.filter(d => d.one === one && d.agent === agent).map(d => `<a data-p="${d.p}">${d.p.slice(1)} · ${d.t}</a>`).join('')}</div>`;
+  box.innerHTML = `<div class="dgrid"><span></span><span class="h">you decided</span><span class="h">agent default</span>
+    <span class="h rh">one-way</span>${cell(true, false)}${cell(true, true, true)}
+    <span class="h rh">two-way</span>${cell(false, false)}${cell(false, true)}</div>`;
+});
+// timeline: rows of events and spans on one shared axis — dates (YYYY-MM-DD), or plain numbers with data-unit (e.g. "s")
+document.querySelectorAll('.timeline[data-rows]').forEach(el => {
+  const rows = JSON.parse(el.dataset.rows), unit = el.dataset.unit, nowAt = el.dataset.now;
+  const val = v => unit ? +v : new Date(v + 'T00:00:00Z').getTime();
+  const fmt = v => unit ? `${v}${unit}` : new Date(v + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const at = e => e.at ?? e.date;
+  const all = rows.flatMap(r => [...r.events.map(e => val(at(e))), ...(r.spans || []).flatMap(s => [val(s.from), val(s.to)])]);
+  const lo = Math.min(...all), hi = Math.max(...all), W = 720, L = 110, R = 40, H = 78;
+  const x = v => L + (val(v) - lo) / Math.max(1, hi - lo) * (W - L - R);
+  let svg = '';
+  rows.forEach((r, i) => {
+    const y = 40 + i * H;
+    svg += `<text x="10" y="${y + 4}" font-weight="600">${r.label}</text><line class="axis" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/>`;
+    (r.spans || []).forEach(s => {
+      const a = x(s.from), b = x(s.to), t = s.tone || 'neutral';
+      svg += `<path class="span ${t}" d="M${a} ${y + 12} v6 H${b} v-6"/><text class="muted-t" x="${(a + b) / 2}" y="${y + 32}" text-anchor="middle">${s.text}</text>`;
+    });
+    r.events.forEach((e, j) => {
+      const cx = x(at(e)), t = e.tone || 'neutral', up = j % 2 === 0 ? -12 : -24;
+      svg += `<circle class="${t}" cx="${cx}" cy="${y}" r="5"/><text x="${cx}" y="${y + up}" text-anchor="middle">${e.text} <tspan class="muted-t">${fmt(at(e))}</tspan></text>`;
+    });
+  });
+  if (nowAt) svg += `<line class="now" x1="${x(nowAt)}" x2="${x(nowAt)}" y1="14" y2="${rows.length * H + 10}"/><text x="${x(nowAt) + 4}" y="12" class="muted-t">${el.dataset.nowLabel || 'today'}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${rows.length * H + 20}" role="img">${svg}</svg>`;
+});
+function show(p) {
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.p === p));
+  document.querySelectorAll('.panel').forEach(x => x.classList.toggle('on', x.id === 'p-' + p));
+  history.replaceState(null, '', '#' + p);
+  window.scrollTo(0, 0);
+  drawDiagrams();
+}
+document.querySelectorAll('nav a, main a[data-p], main [data-p]:not(.rv)').forEach(a => a.onclick = () => show(a.dataset.p));
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  const panel = b.closest('.panel');
+  panel.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  panel.querySelectorAll('[data-tab]').forEach(t => t.hidden = t.dataset.tab !== b.dataset.t);
+});
+const fromHash = () => { const p = location.hash.slice(1); if (p && document.getElementById('p-' + p)) show(p); };
+addEventListener('hashchange', fromHash);
+fromHash();
+// Mermaid measures nothing inside a hidden panel, so each diagram is drawn when its panel opens.
+function drawDiagrams() {
+  if (!window.mermaid) return;
+  if (!drawDiagrams.ready) {
+    mermaid.initialize({ startOnLoad: false, theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'neutral' });
+    drawDiagrams.ready = true;
+  }
+  const nodes = [...document.querySelectorAll('.panel.on .mermaid:not([data-processed])')];
+  if (nodes.length) mermaid.run({ nodes });
+}
+drawDiagrams();
+</script>
+<!-- Loaded last and in the background, so the guide renders even when the CDN is slow or offline. -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" defer onload="drawDiagrams()"></script>
+</body>
+</html>
