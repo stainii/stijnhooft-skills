@@ -38,6 +38,8 @@ skills/
     ├── SKILL.md      the instructions the agent follows (name + description in the frontmatter)
     ├── README.md     for people
     └── …             whatever the skill loads on demand
+tests/
+└── <name>/           tests for a skill's scripts, kept out of the installed folder
 ```
 
 A new skill is a new folder under `skills/`. The CLI finds it with no manifest, and it gets a row

@@ -85,8 +85,8 @@ npx skills add stainii/stijnhooft-skills --skill session-guide
 ```
 
 `-a claude-code` limits the install to Claude Code, and `--copy` copies the files instead of
-symlinking them. The CLI installs the whole skill folder: `SKILL.md`, `template.html`,
-`MERGE-REQUEST.md`, `QUIZ.md` and this README. To update later:
+symlinking them. The CLI installs the whole skill folder (see [Files](#files)). It needs
+`python3` (standard library only) and `git`. To update later:
 
 ```bash
 npx skills update session-guide
@@ -117,7 +117,9 @@ Run it yourself at the end of a session, while the agent still has the conversat
 | `/session-guide reviewed` | Marks the branch head as the version reviewers saw (local file, never pushed) |
 | `/session-guide quiz` | 3–5 questions on the change, one at a time, to check you really own it |
 
-Guides are written to `.claude/session-guides/` in the repo. The skill checks that this folder is
+Guides are written to `.claude/session-guides/` in the repo: a folder per guide holding its data
+(`facts.json`, `guide.json`, `parts/`), and next to it the page (`<name>.html`) and the MR text
+(`<name>.mr.md`). The skill checks that this folder is
 gitignored and asks before writing anywhere else. Open them in a browser. A static server makes
 in-page links and hashes behave best:
 
@@ -130,6 +132,11 @@ conversation, and a reminder on every turn is noise.
 
 ## How it stays honest
 
+- **A script checks the guide against the code** before it renders. A changed file nothing
+  explains, a `path:line` past the end of its file, a hunk range with no changed lines, a decision
+  with no code behind it: each is reported, and the page is only written when there are none.
+- **Hunks are pulled from git**, never retyped by the agent, so the code on the page is the code in
+  the repo.
 - **Every call-tree edge is checked against the code** (`grep` the caller for the callee) before it
   goes into the guide. Anything that couldn't be confirmed is marked *unverified*.
 - **Assumptions are labelled** as *assumed*, never stated as fact.
@@ -137,17 +144,39 @@ conversation, and a reminder on every turn is noise.
 - It uses the repo's own records: it links ADRs and `CONTEXT.md` terms instead of restating them,
   and proposes an ADR for architectural decisions.
 
+## How it keeps the cost down
+
+The agent writes **data, not a page**. Everything measurable comes from scripts: line counts,
+tiers, layers, renames, the change map, the file tree, the review size, the lineage git can see,
+and the code in every hunk. The agent reads code one file at a time, only for the files a reviewer
+must read, and writes only what the scripts can't know: the *why*.
+
+A large change (more than 50 files or 3000 changed lines) is split into jobs of up to 1500 lines to
+read. A subagent per job reads that code and writes its part of the guide; the main session reads
+the parts, not the code, so its context stays small. Large guides also group the change map per
+directory.
+
 ## Files
 
 | File | Role |
 |---|---|
 | `SKILL.md` | The steps the agent follows, and the vocabulary (*door*, *blast radius*, *agent default*, *smallest view*) |
-| `template.html` | The page: Bento-style theme (light and dark), every component, no build step. The agent fills it in |
+| `guide.schema.ts` | The format of `guide.json`, the only thing the agent writes |
+| `scripts/gather.py` | Measures the change into `facts.json`: files, lines, tiers, layers, renames, modules, jobs, since-last-review |
+| `scripts/build.py` | Merges the parts, checks the guide against the code, renders the page and the MR text |
+| `scripts/guide.py`, `source.py`, `views.py` | What `build.py` is made of: the guide as data, the code as git sees it, and what the page and MR show |
+| `scripts/files.py` | Lists the changed files, per job or tier |
+| `template.html` | The page: Bento-style theme (light and dark), every component, drawn from the embedded data. Nobody edits it per guide |
+| `SUBAGENTS.md` | Large changes: one subagent per job, loaded only then |
+| `REFACTORING.md` | Lineage, changed in transit, behaviour, loaded only for a refactoring |
 | `MERGE-REQUEST.md` | `mr` and `reviewed`, loaded only for those |
 | `QUIZ.md` | `quiz`, loaded only for that |
 
-The page needs no build step. Fonts (Geist) and Mermaid come from CDNs and the page still renders
-without them, apart from the Mermaid diagrams.
+Each page is one self-contained HTML file. Fonts (Geist) and Mermaid come from CDNs and the page
+still renders without them, apart from the Mermaid diagrams.
+
+The scripts' tests are in [`tests/session-guide`](../../tests/session-guide), outside the skill so
+they aren't installed: `python3 -m unittest discover -s tests/session-guide` from the repo root.
 
 ## Credits and further reading
 

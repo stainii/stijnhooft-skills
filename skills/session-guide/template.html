@@ -5,12 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-<title><!-- SLOT: ticket number + short title --></title>
-<!--
-  Session guide template. Copy, then fill every SLOT and repeat every REPEAT block.
-  Keep the CSS and the script as they are. HTML-escape all code: < becomes &lt;, > becomes &gt;, & becomes &amp;.
-  Navigation works by data-p="<id>" on a nav link matching id="p-<id>" on a panel.
--->
+<title>Session guide</title>
+<!-- The page that renders a session guide. build.py fills GUIDE_DATA; the agent never reads or edits this file. -->
 <style>
 :root {
   color-scheme: light dark;
@@ -358,289 +354,162 @@ ol.readorder li.skip { opacity: .7; }
 </style>
 </head>
 <body>
-<div class="shell">
-  <nav>
-    <div style="font-weight:600"><!-- SLOT: ticket number + short title --></div>
-    <div class="muted small"><!-- SLOT: ADR refs · branch · last updated YYYY-MM-DD --></div>
-
-    <h4>Overview</h4>
-    <div class="list"><a data-p="overview" class="on">Context &amp; shape</a>
-<a data-p="contracts">Contracts (<!-- SLOT: count -->)</a>
-<a data-p="review">Review this (<!-- SLOT: count -->)</a></div>
-
-    <h4>Walkthrough: <!-- SLOT: the request being followed --></h4>
-    <!-- One link per stop, indented as the call tree. ● = changed, ! = review. One flow per list; add a second h4 + list for a second flow. -->
-    <div class="list"><a data-p="w1">1 EntryPoint</a>
-<a data-p="w2">  2 changedMethod <span class="chg">●</span><span class="rev">!</span></a></div>
-
-    <!-- Merge request: always the first three; Split plan only when the read lines exceed the budget or the MR
-         mixes refactoring with behaviour; Since last review only once a version was marked reviewed. -->
-    <h4>Merge request</h4>
-    <div class="list"><a data-p="readorder">Read in this order</a>
-<a data-p="split">Split plan</a>
-<a data-p="since">Since last review</a>
-<a data-p="mr">MR description</a></div>
-
-    <!-- Refactoring only: when files were deleted, created, renamed, split or merged. -->
-    <h4>Refactoring</h4>
-    <div class="list"><a data-p="lineage">Lineage</a>
-<a data-p="transit">Changed in transit (<!-- SLOT -->)</a>
-<a data-p="behaviour">Behaviour</a></div>
-
-    <h4>Decisions</h4>
-    <div class="list"><a data-p="d1">1 <!-- SLOT: short decision name --></a></div>
-
-    <p class="small muted" style="margin-top:14px"><span class="chg">●</span> changed &nbsp; <span class="rev">!</span> review this</p>
-  </nav>
-
-  <main>
-    <div class="panel on" id="p-overview">
-      <h1><!-- SLOT: title --></h1>
-      <p><!-- SLOT: Context — the problem in the user's terms, why now --></p>
-      <p class="small muted">Out of scope: <!-- SLOT --></p>
-
-      <!-- Ship / Show / Ask, and the effective review size in lines: read (logic), skim (tests, DTOs, config),
-           skip (moved unchanged, generated, deleted — check the list, not the lines). -->
-      <div class="mr-strip">
-        <div class="ssa"><h4>Ship · Show · Ask</h4><span class="ssa-badge ask">Ask</span><div class="small muted"><!-- SLOT: why --></div></div>
-        <div class="sizebox" data-read="0" data-skim="0" data-skip="0" data-budget="400"><h4>Review size</h4></div>
-      </div>
-
-      <h2>Where we are</h2>
-      <!-- SLOT: the system as it stood at this commit, C4 level 2 with the components inside each container.
-           Take it from the repo's architecture doc (else the directory layout), at this commit. Class "hit" on every
-           container and component this change touches; data-p links a component to its stop or decision.
-           Main row: the request path, joined by .c4-link labels. Second row: stores and external systems (.db, .ext). -->
-      <div class="c4">
-        <div class="c4-person">You · phone / laptop</div>
-        <div class="c4-row">
-          <div class="c4-box hit"><div class="c4-head"><b>Container</b><small>technology</small></div>
-            <div class="c4-comps"><span class="c4-comp hit" data-p="w1">component</span><span class="c4-comp">other</span></div></div>
-          <span class="c4-link">protocol</span>
-          <div class="c4-box"><div class="c4-head"><b>Container</b><small>technology</small></div></div>
-        </div>
-        <div class="c4-row">
-          <div class="c4-box db"><div class="c4-head"><b>Store</b><small>technology</small></div></div>
-          <span class="c4-link"></span>
-          <div class="c4-box ext"><div class="c4-head"><b>External system</b><small>role</small></div></div>
-        </div>
-      </div>
-
-      <h2>Shape of the change</h2>
-      <!-- Walkthrough chain and decision grid are drawn automatically from the nav and the decision panels. -->
-      <div class="auto-flow"></div>
-      <!-- SLOT: change map — one .layer per layer that changed (UI, API, domain, persistence, migration,
-           shared fixtures, tests, docs). One .chip per file; add class "new" for added files and
-           "review" for files with a review item; data-p links to the stop or decision that explains it.
-           Group many trivial files into one chip ("fold-fixtures 01–14", summed counts). -->
-      <div class="map">
-        <div class="layer"><div class="layer-name">Domain</div><div class="chips">
-          <a class="chip" data-p="w2" data-add="0" data-del="0"><b>File.java</b></a>
-        </div></div>
-      </div>
-      <!-- SLOT: a call-tree diff of the changed flow (smallest view that shows it). -->
-      <pre class="diff"><code></code></pre>
-      <!-- SLOT: file tree of EVERY changed file, one line each, +/- for added/removed files. -->
-      <pre class="diff"><code></code></pre>
-
-      <h2>Decisions at a glance</h2>
-      <div class="auto-decisions"></div>
-
-      <h2>Evidence</h2>
-      <!-- SLOT, when time or dates matter: a before/after timeline. Events: date (YYYY-MM-DD), text, tone ok|bad|neutral.
-           Spans: from, to, text, tone. data-now draws a "today" line. Otherwise a Mermaid state or sequence diagram, or a screenshot. -->
-      <div class="timeline" data-now="" data-rows='[{"label":"Before","events":[],"spans":[]},{"label":"After","events":[],"spans":[]}]'></div>
-      <div class="cards">
-        <div class="card"><b>Before</b><pre><code><!-- SLOT --></code></pre></div>
-        <div class="card"><b>After</b><pre><code><!-- SLOT --></code></pre></div>
-      </div>
-      <p class="small">Not covered: <!-- SLOT --></p>
-
-      <h2>Merge danger</h2>
-      <p><span class="badge one-way">one-way door</span><!-- or two-way --> <!-- SLOT: why --> <b>Blast radius:</b> <!-- SLOT --></p>
-
-      <h2>Sessions</h2>
-      <ul class="small"><li><!-- SLOT: YYYY-MM-DD — one line --></li></ul>
-    </div>
-
-    <!-- Contracts: only changed signatures, types, endpoints, events, schema — no bodies. Read first by a reviewer. -->
-    <div class="panel" id="p-contracts">
-      <h1>Contracts</h1>
-      <p class="muted small">What callers see change. Bodies are in the walkthrough.</p>
-      <!-- REPEAT per changed contract -->
-      <div class="stop">
-        <div class="loc"><!-- SLOT: path:line --></div>
-        <p><!-- SLOT: who depends on it --></p>
-        <pre class="diff"><code><!-- SLOT: signature or type diff only --></code></pre>
-        <!-- A big contract (more than three members changed, or lines too long to compare by eye) gets a shape table
-             instead, with the raw diff folded underneath:
-        <div class="shape" data-name="TypeName" data-before='[["field","Type"]]'
-             data-after='[["field","NewType"],{"n":"renamed","t":"Type","was":"old","note":"why"}]'></div>
-        <details class="hunk"><summary>The raw diff</summary><pre class="diff"><code>…</code></pre></details> -->
-      </div>
-    </div>
-
-    <div class="panel" id="p-review">
-      <h1>Review this</h1>
-      <!-- The summary line fills itself from the cards below. -->
-      <div class="rv-summary"></div>
-
-      <!-- REPEAT per point, most severe first. data-sev: high | med | low | ok (checked, holds).
-           Tags: the kind (doc ≠ code, race, untested, one-way door, agent default, drift) — each a .rv-tag.
-           Proof, the smallest that convinces — use one or more:
-             .rv-vs      what the docs/comment/test claim beside what the code does
-             .rv-steps   a concrete scenario, step by step; li.bad / li.good mark the turn
-             a hunk      <div class="loc"> + <pre class="diff">, or a query or command that settles it
-           End on .rv-ask: the decision or check that is the user's. -->
-      <div class="rv" id="rv1" data-sev="high">
-        <div class="rv-head"><input type="checkbox" aria-label="Reviewed"><h3><!-- SLOT: the point, as a claim --></h3></div>
-        <div class="rv-tags"><span class="rv-tag"><!-- SLOT: kind --></span></div>
-        <div class="rv-body">
-          <p><!-- SLOT: why it matters, in one or two sentences --></p>
-          <div class="rv-vs">
-            <div class="says"><h4><!-- SLOT: The docs say --></h4><!-- SLOT --></div>
-            <div class="does"><h4><!-- SLOT: The code does --></h4><!-- SLOT --></div>
-          </div>
-          <ol class="rv-steps"><li><!-- SLOT --></li><li class="bad"><!-- SLOT: where it goes wrong --></li></ol>
-          <div class="rv-ask"><b>Decide:</b> <!-- SLOT --></div>
-          <div class="rv-links">See <a data-p="w1">stop 1</a></div>
-        </div>
-      </div>
-
-      <h2>Dead ends and surprises</h2>
-      <ul><li><!-- SLOT --></li></ul>
-    </div>
-
-    <!-- REPEAT per walkthrough stop. A stop flagged review uses the tabs variant below instead. -->
-    <div class="panel" id="p-w1">
-      <div class="loc"><!-- SLOT: path:line --></div>
-      <h1><!-- SLOT: 1 · what this stop is --></h1>
-      <p><!-- SLOT: what happens here and why it is shaped this way --></p>
-      <!-- Logic: pseudocode first, the real hunk folded underneath. Trivial or mechanical: the hunk alone, open.
-           State that matters (statuses, answers, modes): a Mermaid stateDiagram-v2 in <div class="mermaid">. -->
-      <pre class="pseudo"><code><!-- SLOT: pseudocode, diff markers allowed --></code></pre>
-      <details class="hunk"><summary>The real change · <!-- SLOT: path:line --></summary><pre class="diff"><code><!-- SLOT --></code></pre></details>
-    </div>
-
-    <!-- Review stop variant: Diff / Why / Alternatives tabs. -->
-    <div class="panel" id="p-w2">
-      <div class="loc"><!-- SLOT: path:line --></div>
-      <h1><!-- SLOT --> <span class="badge agent">review</span></h1>
-      <div class="tabs"><button class="on" data-t="diff">Diff</button><button data-t="why">Why</button><button data-t="alt">Alternatives</button></div>
-      <div data-tab="diff"><pre class="diff"><code></code></pre></div>
-      <div data-tab="why" hidden><p></p></div>
-      <div data-tab="alt" hidden><p></p></div>
-    </div>
-
-    <div class="panel" id="p-readorder">
-      <h1>Read in this order</h1>
-      <!-- REPEAT, in the order a reviewer should go: tier read | skim | skip, the files, why at this point. -->
-      <ol class="readorder">
-        <li><span class="tier read">read</span><div><code><!-- SLOT: files --></code><div class="why"><!-- SLOT --></div></div></li>
-      </ol>
-    </div>
-
-    <div class="panel" id="p-split">
-      <h1>Split plan</h1>
-      <!-- REPEAT per proposed MR, in safe merge order. kind: refactor | new | behaviour. Class "warn" on an MR that must
-           not merge alone (say what it must travel with). -->
-      <div class="split">
-        <div class="split-mr"><div class="split-head"><span class="n">MR 1</span><h3><!-- SLOT --></h3><span class="kind new">new code</span><span class="badge two-way">Show</span><span class="n">~0 read</span></div>
-          <ul><li><!-- SLOT --></li></ul></div>
-      </div>
-    </div>
-
-    <!-- Since last review: git range-diff <base>..<reviewed> <base>..HEAD, plus the findings each change answers. -->
-    <div class="panel" id="p-since">
-      <h1>Since last review</h1>
-      <div class="since">
-        <div class="since-row"><span class="since-st same">unchanged</span><code><!-- SLOT: sha --></code><span><!-- SLOT: subject --></span></div>
-      </div>
-      <div class="findings"><div class="finding"><span><!-- SLOT: finding → where it is answered --></span></div></div>
-    </div>
-
-    <div class="panel" id="p-mr">
-      <h1>MR description</h1>
-      <p class="small muted">Also written to <code><!-- SLOT: path --></code>. Paste it into the merge request.</p>
-      <div class="mrtext"><button class="copy">Copy</button><pre><code><!-- SLOT: the Markdown --></code></pre></div>
-    </div>
-
-    <!-- Refactoring panels. Lineage: every old file on the left, every new one on the right. A link git detects
-         (git diff -M -C --name-status, with its similarity) is by "git"; one only the session knows is by "agent".
-         An old file with no link is drawn deleted; a new one with no link is drawn new. -->
-    <div class="panel" id="p-lineage">
-      <h1>Lineage</h1>
-      <div class="lineage" data-old='[{"n":"Old.java","g":"package"}]' data-new='[{"n":"New.java","g":"package","p":"w1"}]'
-           data-links='[{"from":["Old.java"],"to":["New.java"],"kind":"renamed","sim":97,"by":"git"}]'></div>
-      <h2>Where did it go</h2>
-      <!-- One row per responsibility, not per file. how: moved | merged | rewritten | deleted | derived | new -->
-      <table class="whereto"><tr><th>Responsibility</th><th>Before</th><th>After</th><th>How</th></tr>
-        <tr><td><!-- SLOT --></td><td><code><!-- SLOT --></code></td><td><code><!-- SLOT --></code></td><td><span class="how moved">moved</span></td></tr>
-      </table>
-    </div>
-
-    <!-- Changed in transit: each moved or merged piece. Class "unchanged" when it moved as-is (one line, no code);
-         otherwise before and after side by side, with the lines that changed meaning wrapped in <mark>. -->
-    <div class="panel" id="p-transit">
-      <h1>Changed in transit</h1>
-      <div class="transit">
-        <div class="transit-head"><span><!-- SLOT: old place --></span><span class="arrow">→</span><span><!-- SLOT: new place --></span><span class="how rewritten">changed</span></div>
-        <p><!-- SLOT: what changed in meaning --></p>
-        <div class="transit-pair"><div><h4>before</h4><pre><code></code></pre></div><div><h4>after</h4><pre><code></code></pre></div></div>
-      </div>
-    </div>
-
-    <!-- Behaviour: a refactoring claims nothing changes. Ledger of what changed on purpose and what must not have;
-         tests as a shape table (before → after, with "was" for a test that moved), deleted tests with no successor flagged. -->
-    <div class="panel" id="p-behaviour">
-      <h1>Behaviour</h1>
-      <table class="whereto"><tr><th>Behaviour</th><th>Before</th><th>After</th><th>Status</th></tr></table>
-      <div class="shape" data-name="Tests" data-before='[]' data-after='[]'></div>
-    </div>
-
-    <!-- REPEAT per decision: the deep dive, a scroll of every hunk that implements it. -->
-    <div class="panel" id="p-d1">
-      <span class="badge two-way">two-way</span><span class="badge agent">agent default</span><!-- or <span class="badge user">you</span> -->
-      <h1><!-- SLOT: decision --></h1>
-      <p><b>Why:</b> <!-- SLOT: the reason from the session --></p>
-      <p><b>Alternatives:</b> <!-- SLOT: each, and why it lost; or "none considered" --></p>
-      <!-- REPEAT per hunk that implements the decision -->
-      <div class="stop">
-        <div class="loc"><!-- SLOT: path:line --></div>
-        <p><!-- SLOT: what this hunk does for the decision --></p>
-        <pre class="diff"><code></code></pre>
-      </div>
-    </div>
-  </main>
-</div>
+<script id="guide-data" type="application/json">/*GUIDE_DATA*/</script>
+<div class="shell"><nav id="nav"></nav><main id="main"></main></div>
 
 <script>
-document.querySelectorAll('pre.diff code').forEach(c => {
-  c.innerHTML = c.innerHTML.split('\n').map(l =>
-    `<span class="${l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : 'ctx'}">${l || ' '}</span>`).join('');
+// Renders the whole guide from the data above. build.py embeds the data; nobody edits this page by hand.
+const D = JSON.parse(document.getElementById('guide-data').textContent);
+const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// Text: `code`, **bold**, *italic*, [label](#panel); paragraphs on blank lines
+const md = t => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+  .replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\w)/g, '$1<i>$2</i>')
+  .replace(/\[([^\]]+)\]\(#([\w-]+)\)/g, '<a data-p="$2">$1</a>').replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>');
+const P = t => t ? `<p>${md(t)}</p>` : '';
+const line = l => `<span class="${l[0] === '+' ? 'add' : l[0] === '-' ? 'del' : 'ctx'}">${esc(l) || ' '}</span>`;
+const diffText = s => `<pre class="diff"><code>${String(s).split('\n').map(line).join('')}</code></pre>`;
+const hunk = ref => D.hunks?.[ref] ? `<pre class="diff"><code>${D.hunks[ref].map(([m, t]) => line(m + ' ' + t)).join('')}</code></pre>` : '';
+const loc = ref => ref ? `<div class="loc">${esc(ref)}</div>` : '';
+const diagram = s => s ? `<div class="mermaid">${esc(s)}</div>` : '';
+const list = (xs, f) => (xs || []).map(f).join('');
+const stops = D.flows.flatMap(f => f.stops);
+const sevOrder = { high: 0, med: 1, low: 2, ok: 3 };
+const cards = [...D.review].sort((a, b) => (sevOrder[a.sev] ?? 9) - (sevOrder[b.sev] ?? 9));
+const rf = D.refactoring;
+// what a link to a panel says: "stop 5 · resolveVoids", "decision 3 · …", or the panel's own name
+const label = Object.fromEntries([...stops.map((s, i) => [s.id, `stop ${i + 1} · ${s.title}`]), ...D.decisions.map((d, i) => [d.id, `decision ${i + 1} · ${d.title}`])]);
+document.title = D.title;
+
+// ---------- nav ----------
+const navList = items => `<div class="list">${items.join('\n')}</div>`;
+const navLink = (p, label, cls = '') => `<a data-p="${esc(p)}"${cls}>${label}</a>`;
+let nav = `<div>${esc(D.title)}</div><div class="muted small">${esc(D.meta)}</div>
+  <h4>Overview</h4>${navList([navLink('overview', 'Context &amp; shape', ' class="on"'), navLink('contracts', `Contracts (${D.contracts.length})`),
+    navLink('review', `Review this (${cards.filter(c => c.sev !== 'ok').length})`)])}`;
+let n = 0;
+D.flows.forEach(f => {
+  nav += `<h4>Walkthrough: ${esc(f.title)}</h4>` + navList(f.stops.map(s => navLink(s.id,
+    `${'  '.repeat(s.depth || 0)}${++n} ${esc(s.title)}${s.hunk ? ' <span class="chg">●</span>' : ''}${s.review ? '<span class="rev">!</span>' : ''}`)));
+});
+nav += `<h4>Merge request</h4>${navList([navLink('readorder', 'Read in this order'), D.split?.length ? navLink('split', 'Split plan') : '',
+  D.since ? navLink('since', 'Since last review') : '', navLink('mr', 'MR description')].filter(Boolean))}`;
+if (rf) nav += `<h4>Refactoring</h4>${navList([navLink('lineage', 'Lineage'), navLink('transit', `Changed in transit (${rf.transit.length})`), navLink('behaviour', 'Behaviour')])}`;
+nav += `<h4>Decisions</h4>${navList(D.decisions.map((d, i) => navLink(d.id, `${i + 1} ${esc(d.title)}`)))}
+  <p class="small muted" style="margin-top:14px"><span class="chg">●</span> changed &nbsp; <span class="rev">!</span> review this</p>`;
+document.getElementById('nav').innerHTML = nav;
+
+// ---------- overview ----------
+const c4 = m => m ? `<div class="c4">${m.person ? `<div class="c4-person">${esc(m.person)}</div>` : ''}${list(m.rows, row =>
+  `<div class="c4-row">${row.map((b, i) => `<div class="c4-box${b.hit ? ' hit' : ''}${b.kind ? ' ' + b.kind : ''}"><div class="c4-head"><b>${esc(b.name)}</b><small>${esc(b.tech)}</small></div>${
+    b.comps?.length ? `<div class="c4-comps">${list(b.comps, c => `<span class="c4-comp${c.hit ? ' hit' : ''}"${c.panel ? ` data-p="${esc(c.panel)}"` : ''}>${esc(c.name)}</span>`)}</div>` : ''}</div>${
+    i < row.length - 1 ? `<span class="c4-link">${esc(b.link)}</span>` : ''}`).join('')}</div>`)}</div>` : '';
+const where = D.where?.before ? `<div class="ba"><div><h3>Before</h3>${c4(D.where.before)}</div><div><h3>After</h3>${c4(D.where.after)}</div></div>` : c4(D.where);
+const chip = c => `<a class="chip${c.status === 'A' ? ' new' : c.status === 'D' ? ' gone' : ''}${c.review ? ' review' : ''}"${c.panel ? ` data-p="${esc(c.panel)}"` : ''} data-add="${c.add}" data-del="${c.del}"${c.path ? ` title="${esc(c.path)}"` : ''}><b>${esc(c.label)}</b>${c.files > 1 ? `<span class="n">${c.files} files</span>` : ''}</a>`;
+const map = `<div class="map">${list(D.map, l => `<div class="layer"><div class="layer-name">${esc(l.layer)}</div><div class="chips">${list(l.chips, chip)}</div></div>`)}</div>`;
+let k = 0;
+const flowsHtml = list(D.flows, f => `<div class="flow"><div class="flow-title">Walkthrough: ${esc(f.title)}</div><div class="flow-row">${f.stops.map((s, i) =>
+  `<span class="flow-box${s.hunk ? ' chg' : ''}${s.review ? ' rev' : ''}" data-p="${esc(s.id)}"><small>${s.depth ? '↳ '.repeat(s.depth).trim() : (i ? 'then' : 'entry')}</small>${++k} ${esc(s.title)}</span>`).join('<span class="flow-arrow">→</span>')}</div></div>`);
+const dgrid = (() => {
+  const cell = (one, agent, hot) => `<div class="cell${hot ? ' hot' : ''}">${hot ? '<span class="tag">review hardest</span>' : ''}${
+    list(D.decisions.map((d, i) => ({ ...d, i })).filter(d => (d.door === 'one-way') === one && (d.by === 'agent') === agent), d => `<a data-p="${esc(d.id)}">${d.i + 1} · ${esc(d.title)}</a>`)}</div>`;
+  return `<div class="dgrid"><span></span><span class="h">you decided</span><span class="h">agent default</span>
+    <span class="h rh">one-way</span>${cell(true, false)}${cell(true, true, true)}<span class="h rh">two-way</span>${cell(false, false)}${cell(false, true)}</div>`;
+})();
+const ev = D.evidence || {};
+const evidence = `${ev.timeline ? `<div class="timeline" data-rows="${esc(JSON.stringify(ev.timeline.rows))}" data-now="${esc(ev.timeline.now)}"${ev.timeline.unit ? ` data-unit="${esc(ev.timeline.unit)}"` : ''}></div>` : ''}
+  ${diagram(ev.mermaid)}${ev.before || ev.after ? `<div class="cards"><div class="card"><b>Before</b><pre><code>${esc(ev.before)}</code></pre></div><div class="card"><b>After</b><pre><code>${esc(ev.after)}</code></pre></div></div>` : ''}
+  ${ev.test ? `<p class="small">Pinned by <code>${esc(ev.test)}</code></p>` : ''}<p class="small">Not covered: ${md(ev.notCovered)}</p>`;
+const S = D.size;
+let main = `<div class="panel on" id="p-overview"><h1>${esc(D.title)}</h1>${P(D.context)}${D.outOfScope ? `<p class="small muted">Out of scope: ${md(D.outOfScope)}</p>` : ''}
+  <div class="mr-strip"><div class="ssa"><h4>Ship · Show · Ask</h4><span class="ssa-badge ${esc(D.ship.call)}">${esc(D.ship.call[0].toUpperCase() + D.ship.call.slice(1))}</span><div class="small muted">${md(D.ship.why)}</div></div>
+    <div class="sizebox" data-read="${S.read}" data-skim="${S.skim}" data-skip="${S.skip}" data-budget="${S.budget}"><h4>Review size</h4></div></div>
+  ${where ? `<h2>Where we are</h2>${where}` : ''}
+  <h2>Shape of the change</h2>${flowsHtml}${D.large ? '<p class="small muted">A large change: files are grouped per directory, and the walkthrough shows where each change is rather than its code.</p>' : ''}${map}
+  ${D.callTree ? diffText(D.callTree) : ''}<details class="hunk"><summary>Every changed file</summary>${diffText(D.tree)}</details>
+  <h2>Decisions at a glance</h2>${dgrid}
+  <h2>Evidence</h2>${evidence}
+  <h2>Merge danger</h2><p><span class="badge ${esc(D.danger.door)}">${esc(D.danger.door)} door</span> ${md(D.danger.why)} <b>Blast radius:</b> ${md(D.danger.blast)}</p>
+  <h2>Sessions</h2><ul class="small">${list(D.sessions, s => `<li>${esc(s.date)}: ${md(s.text)}</li>`) || '<li>None recorded.</li>'}</ul></div>`;
+
+// ---------- contracts and review ----------
+const shape = s => s ? `<div class="shape" data-name="${esc(s.name)}" data-before="${esc(JSON.stringify(s.before))}" data-after="${esc(JSON.stringify(s.after))}"></div>` : '';
+main += `<div class="panel" id="p-contracts"><h1>Contracts</h1><p class="muted small">What callers see change. Bodies are in the walkthrough.</p>
+  ${list(D.contracts, c => `<div class="stop">${loc(c.at)}${P(c.who)}${c.shape ? shape(c.shape) + (c.hunk ? `<details class="hunk"><summary>The raw diff</summary>${hunk(c.hunk)}</details>` : '') : hunk(c.hunk)}</div>`) || '<p>No contract changed.</p>'}</div>`;
+const card = c => `<div class="rv" id="rv-${esc(c.id)}" data-sev="${esc(c.sev)}"><div class="rv-head"><input type="checkbox" aria-label="Reviewed"><h3>${esc(c.claim)}</h3></div>
+  <div class="rv-tags">${list(c.kinds, t => `<span class="rv-tag">${esc(t)}</span>`)}${c.sev === 'ok' ? '<span class="rv-tag">holds</span>' : ''}</div>
+  <div class="rv-body">${P(c.why)}${c.says || c.does ? `<div class="rv-vs"><div class="says"><h4>${esc(c.says?.label)}</h4>${md(c.says?.text)}</div><div class="does"><h4>${esc(c.does?.label)}</h4>${md(c.does?.text)}</div></div>` : ''}
+    ${c.steps ? `<ol class="rv-steps">${list(c.steps, s => `<li${s.mark ? ` class="${esc(s.mark)}"` : ''}>${md(s.text)}</li>`)}</ol>` : ''}
+    ${c.hunk ? loc(c.hunk) + hunk(c.hunk) : ''}${c.command ? `<pre><code>${esc(c.command)}</code></pre>` : ''}
+    <div class="rv-ask"><b>${c.sev === 'ok' ? 'Checked' : 'Decide'}:</b> ${md(c.ask)}</div>
+    ${c.see?.length ? `<div class="rv-links">See ${c.see.map(p => `<a data-p="${esc(p)}">${esc(label[p] || p)}</a>`).join(' · ')}</div>` : ''}</div></div>`;
+main += `<div class="panel" id="p-review"><h1>Review this</h1><div class="rv-summary"></div>${list(cards, card) || '<p>Nothing to review.</p>'}
+  <h2>Dead ends and surprises</h2><ul>${list(D.deadEnds, d => `<li>${md(d)}</li>`) || '<li>None.</li>'}</ul></div>`;
+
+// ---------- walkthrough stops and decisions ----------
+stops.forEach((s, i) => {
+  const code = `${s.pseudo ? `<pre class="pseudo diff"><code>${s.pseudo.split('\n').map(line).join('')}</code></pre>` : ''}${
+    !s.hunk ? '' : !D.hunks[s.hunk] ? `<p class="small muted">The real change: <code>${esc(s.hunk)}</code></p>`
+      : s.pseudo ? `<details class="hunk"><summary>The real change · ${esc(s.hunk)}</summary>${hunk(s.hunk)}</details>` : hunk(s.hunk)}${diagram(s.mermaid)}`;
+  main += `<div class="panel" id="p-${esc(s.id)}">${loc(s.at)}<h1>${i + 1} · ${esc(s.title)}${s.review ? ' <span class="badge agent">review</span>' : ''}</h1>${P(s.text)}${
+    s.review ? `<div class="tabs"><button class="on" data-t="diff">Diff</button><button data-t="why">Why</button><button data-t="alt">Alternatives</button></div>
+      <div data-tab="diff">${code}</div><div data-tab="why" hidden>${P(s.review.why)}</div><div data-tab="alt" hidden>${P(s.review.alt)}</div>` : code}</div>`;
+});
+D.decisions.forEach(d => {
+  main += `<div class="panel" id="p-${esc(d.id)}"><span class="badge ${esc(d.door)}">${esc(d.door)}</span>${d.by === 'agent' ? '<span class="badge agent">agent default</span>' : '<span class="badge user">you</span>'}
+    <h1>${esc(d.title)}</h1><p><b>Why:</b> ${md(d.why)}</p><p><b>Alternatives:</b> ${md(d.alt)}</p>
+    ${list(d.hunks, h => `<div class="stop">${loc(h.at)}${P(h.text)}${hunk(h.at)}</div>`)}</div>`;
 });
 
+// ---------- merge request ----------
+main += `<div class="panel" id="p-readorder"><h1>Read in this order</h1><ol class="readorder">${list(D.readOrder, r =>
+  `<li class="${esc(r.tier)}"><span class="tier ${esc(r.tier)}">${esc(r.tier)}</span><div><code>${r.files.map(esc).join('</code> <code>')}</code><div class="why">${md(r.why)}</div></div></li>`)}</ol></div>`;
+const kindLabel = { refactor: 'refactoring', new: 'new code', behaviour: 'behaviour' };
+if (D.split?.length) main += `<div class="panel" id="p-split"><h1>Split plan</h1><div class="split">${list(D.split, (m, i) =>
+  `<div class="split-mr${m.alone ? ' warn' : ''}"><div class="split-head"><span class="n">MR ${i + 1}</span><h3>${esc(m.title)}</h3><span class="kind ${esc(m.kind)}">${kindLabel[m.kind] || esc(m.kind)}</span>
+    <span class="badge ${m.call === 'ask' ? 'one-way' : 'two-way'}">${esc(m.call)}</span><span class="n">~${m.read ?? '?'} read</span></div>
+    <ul>${list(m.items, x => `<li>${md(x)}</li>`)}${m.alone ? `<li><b>Does not merge alone:</b> ${md(m.alone)}</li>` : ''}</ul></div>`)}</div></div>`;
+if (D.since) main += `<div class="panel" id="p-since"><h1>Since last review</h1>${D.since.unreachable ? `<p>The reviewed version <code>${esc(D.since.reviewed)}</code> is no longer reachable; compare versions in the merge request instead.</p>` :
+  `<p class="small muted">Since <code>${esc(D.since.reviewed?.slice(0, 12))}</code>: ${D.since.lines} changed lines.</p><div class="since">${list(D.since.rows, r =>
+    `<div class="since-row ${esc(r.st)}"><span class="since-st ${esc(r.st)}">${esc(r.st === 'same' ? 'unchanged' : r.st)}</span><code>${esc(r.sha)}</code><span>${esc(r.subject)}</span></div>`)}</div>`}
+  ${D.findings?.length ? `<h2>Findings</h2><div class="findings">${list(D.findings, f => `<div class="finding${f.open ? ' open' : ''}"><span>${md(f.text)}</span></div>`)}</div>` : ''}</div>`;
+main += `<div class="panel" id="p-mr"><h1>MR description</h1><p class="small muted">Also written next to this page as <code>.mr.md</code>. Paste it into the merge request.</p>
+  <div class="mrtext"><button class="copy">Copy</button><pre><code>${esc(D.mrText)}</code></pre></div></div>`;
 
-// shape table: data-before / data-after are lists of [name, type] or {n, t, was, note}; matched by name, or by "was"
+// ---------- refactoring ----------
+if (rf) {
+  main += `<div class="panel" id="p-lineage"><h1>Lineage</h1>${list(D.lineage, m => `${D.lineage.length > 1 ? `<h2>${esc(m.title)}</h2>` : ''}<div class="lineage" data-map="${esc(JSON.stringify(m))}"></div>`)}
+    <h2>Where did it go</h2><table class="whereto"><tr><th>Responsibility</th><th>Before</th><th>After</th><th>How</th></tr>${list(rf.whereTo, w =>
+      `<tr><td>${esc(w.what)}</td><td><code>${esc(w.before)}</code></td><td><code>${esc(w.after)}</code></td><td><span class="how ${esc(w.how)}">${esc(w.how)}</span></td></tr>`)}</table></div>`;
+  const marked = (lines, marks) => lines.map(l => (marks || []).reduce((h, m) => h.split(esc(m)).join(`<mark>${esc(m)}</mark>`), esc(l))).join('\n');
+  main += `<div class="panel" id="p-transit"><h1>Changed in transit</h1>${list(rf.transit, t =>
+    `<div class="transit${t.unchanged ? ' unchanged' : ''}"><div class="transit-head"><span>${esc(t.from)}</span><span class="arrow">→</span><span>${esc(t.to)}</span><span class="how ${t.unchanged ? 'moved' : 'rewritten'}">${t.unchanged ? 'as-is' : 'changed'}</span></div>
+      ${P(t.text)}<div class="transit-pair"><div><h4>before</h4><pre><code>${marked(D.code.base[t.from] || [], t.mark)}</code></pre></div><div><h4>after</h4><pre><code>${marked(D.code.now[t.to] || [], t.mark)}</code></pre></div></div></div>`) || '<p>Nothing moved.</p>'}</div>`;
+  main += `<div class="panel" id="p-behaviour"><h1>Behaviour</h1><table class="whereto"><tr><th>Behaviour</th><th>Before</th><th>After</th><th>Status</th></tr>${list(rf.behaviour, b =>
+    `<tr><td>${esc(b.what)}</td><td>${esc(b.before)}</td><td>${esc(b.after)}</td><td><span class="how ${b.status === 'unchanged' ? 'moved' : b.status === 'dropped' ? 'deleted' : 'rewritten'}">${esc(b.status)}</span></td></tr>`)}</table>
+    ${rf.tests ? shape({ name: 'Tests', ...rf.tests }) : ''}</div>`;
+}
+document.getElementById('main').innerHTML = main;
+
+// ---------- components ----------
+// shape table: before / after are lists of [name, type, note] or {name, type, was, note}; matched by name, or by "was"
 document.querySelectorAll('.shape[data-after]').forEach(el => {
-  const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const norm = m => Array.isArray(m) ? { n: m[0], t: m[1], note: m[2] } : m;
+  const norm = m => Array.isArray(m) ? { name: m[0], type: m[1], note: m[2] } : m;
   const before = JSON.parse(el.dataset.before || '[]').map(norm), after = JSON.parse(el.dataset.after).map(norm);
   const used = new Set(), rows = [];
   after.forEach(a => {
-    const b = before.find(x => x.n === (a.was ?? a.n));
+    const b = before.find(x => x.name === (a.was ?? a.name));
     if (b) used.add(b);
-    const kind = !b ? 'added' : a.was && a.was !== a.n ? 'renamed' : (b.t ?? '') !== (a.t ?? '') ? 'changed' : 'same';
+    const kind = !b ? 'added' : a.was && a.was !== a.name ? 'renamed' : (b.type ?? '') !== (a.type ?? '') ? 'changed' : 'same';
     rows.push({ kind, b, a, note: a.note ?? b?.note });
   });
   before.filter(b => !used.has(b)).forEach(b => rows.push({ kind: 'removed', b, note: b.note }));
   const label = { added: '+ added', removed: '− removed', changed: '~ type', renamed: '→ renamed', same: '=' };
-  const cell = m => m ? `${esc(m.n)}${m.t ? ` <span class="t">${esc(m.t)}</span>` : ''}` : '';
+  const cell = m => m ? `${esc(m.name)}${m.type ? ` <span class="t">${esc(m.type)}</span>` : ''}` : '';
   const count = k => rows.filter(r => r.kind === k).length;
   const sum = ['added', 'changed', 'renamed', 'removed'].filter(count).map(k => `<span>${label[k]} ${count(k)}</span>`).join('') + (count('same') ? `<span class="muted">= ${count('same')}</span>` : '');
   el.classList.add('hide-same');
   el.innerHTML = `<div class="shape-head"><b>${esc(el.dataset.name)}</b><span class="shape-sum">${sum}${count('same') ? ' <button class="shape-toggle">show unchanged</button>' : ''}</span></div>
-    <table><tr><th>${esc(el.dataset.beforeLabel || 'before')}</th><th></th><th>${esc(el.dataset.afterLabel || 'after')}</th><th></th></tr>${rows.map(r =>
+    <table><tr><th>before</th><th></th><th>after</th><th></th></tr>${rows.map(r =>
       `<tr class="${r.kind}"><td class="before">${cell(r.b)}</td><td class="st">${label[r.kind]}</td><td class="after">${cell(r.a)}</td><td class="note">${esc(r.note)}</td></tr>`).join('')}</table>`;
   const tg = el.querySelector('.shape-toggle');
   if (tg) tg.onclick = () => { el.classList.toggle('hide-same'); tg.textContent = el.classList.contains('hide-same') ? 'show unchanged' : 'hide unchanged'; };
@@ -648,112 +517,83 @@ document.querySelectorAll('.shape[data-after]').forEach(el => {
 
 // review cards: summary line, and ticks remembered in this browser only
 (() => {
-  const cards = [...document.querySelectorAll('.rv')];
-  if (!cards.length) return;
+  const els = [...document.querySelectorAll('.rv')];
   const key = id => `guide:${location.pathname}:${id}`;
   const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } },
                   set: (k, v) => { try { v ? localStorage.setItem(k, '1') : localStorage.removeItem(k); } catch {} } };
   const summary = () => {
-    const n = sev => cards.filter(c => c.dataset.sev === sev).length;
-    const done = cards.filter(c => c.classList.contains('done')).length;
+    const n = sev => els.filter(c => c.dataset.sev === sev).length;
+    const done = els.filter(c => c.classList.contains('done')).length;
     document.querySelectorAll('.rv-summary').forEach(el => el.innerHTML =
       [['high', 'high'], ['med', 'medium'], ['low', 'low'], ['ok', 'checked, holds']].filter(([s]) => n(s))
-        .map(([s, l]) => `<span class="pill ${s}">${n(s)} ${l}</span>`).join('') + `<span class="muted">${done} of ${cards.length} reviewed</span>`);
+        .map(([s, l]) => `<span class="pill ${s}">${n(s)} ${l}</span>`).join('') + `<span class="muted">${done} of ${els.length} reviewed</span>`);
   };
-  cards.forEach(c => {
+  els.forEach(c => {
     const box = c.querySelector('.rv-head input');
-    if (!box) return;
     box.checked = !!store.get(key(c.id));
     c.classList.toggle('done', box.checked);
     box.onchange = () => { c.classList.toggle('done', box.checked); store.set(key(c.id), box.checked); summary(); };
   });
-  summary();
+  if (els.length) summary();
 })();
 
-// lineage map: data-old / data-new are [{n, g?, p?, review?}]; data-links are [{from:[..], to:[..], kind, sim?, by:'git'|'agent', note?}]
-document.querySelectorAll('.lineage[data-links]').forEach(el => {
-  const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const olds = JSON.parse(el.dataset.old), news = JSON.parse(el.dataset.new), links = JSON.parse(el.dataset.links);
+// lineage map: old files left, new right; nodes {id, name, dir, panel?, review?, note?}, links {from, to, kind, sim?, by, note?}
+document.querySelectorAll('.lineage[data-map]').forEach(el => {
+  const { old: olds, new: news, links } = JSON.parse(el.dataset.map);
   const linkedOld = new Set(links.flatMap(l => l.from)), linkedNew = new Set(links.flatMap(l => l.to));
   // order the new column by the average position of its sources, so lines cross as little as possible
-  const oi = Object.fromEntries(olds.map((o, i) => [o.n, i]));
-  const weight = n => { const src = links.filter(l => l.to.includes(n)).flatMap(l => l.from).map(f => oi[f]);
+  const oi = Object.fromEntries(olds.map((o, i) => [o.id, i]));
+  const weight = id => { const src = links.filter(l => l.to.includes(id)).flatMap(l => l.from).map(f => oi[f]).filter(x => x !== undefined);
     return src.length ? src.reduce((a, b) => a + b, 0) / src.length : olds.length + 1; };
-  const ordered = [...news].sort((a, b) => weight(a.n) - weight(b.n));
+  const ordered = [...news].sort((a, b) => weight(a.id) - weight(b.id));
   const W = 960, NW = 330, NH = 34, GAP = 8, TOP = 34, LX = 0, RX = W - NW;
   const y = i => TOP + i * (NH + GAP);
-  const pos = {}; olds.forEach((o, i) => pos['o:' + o.n] = y(i)); ordered.forEach((o, i) => pos['n:' + o.n] = y(i));
+  const pos = {}; olds.forEach((o, i) => pos['o:' + o.id] = y(i)); ordered.forEach((o, i) => pos['n:' + o.id] = y(i));
   const H = TOP + Math.max(olds.length, ordered.length) * (NH + GAP) + 10;
-  const node = (o, x, side, cls, mark) => `<g class="node ${cls}${o.review ? ' review' : ''}"${o.p ? ` data-p="${o.p}"` : ''}><title>${esc(o.note || o.n)}</title>
-    <rect x="${x}" y="${pos[side + o.n]}" width="${NW}" height="${NH}" rx="9"/>
-    ${o.g ? `<text class="grp" x="${x + 10}" y="${pos[side + o.n] + 13}">${esc(o.g)}</text>` : ''}
-    <text x="${x + 10}" y="${pos[side + o.n] + (o.g ? 27 : 22)}">${esc(o.n)}</text>
-    ${mark ? `<text class="mark" x="${x + NW - 10}" y="${pos[side + o.n] + 22}" text-anchor="end" font-weight="700">${mark}</text>` : ''}</g>`;
+  const node = (o, x, side, cls, mark) => `<g class="node ${cls}${o.review ? ' review' : ''}"${o.panel ? ` data-p="${esc(o.panel)}"` : ''}><title>${esc(o.note || o.id)}</title>
+    <rect x="${x}" y="${pos[side + o.id]}" width="${NW}" height="${NH}" rx="9"/>
+    ${o.dir ? `<text class="grp" x="${x + 10}" y="${pos[side + o.id] + 13}">${esc(o.dir)}</text>` : ''}
+    <text x="${x + 10}" y="${pos[side + o.id] + (o.dir ? 27 : 22)}">${esc(o.name)}</text>
+    ${mark ? `<text class="mark" x="${x + NW - 10}" y="${pos[side + o.id] + 22}" text-anchor="end" font-weight="700">${mark}</text>` : ''}</g>`;
   let svg = `<text class="col-h" x="${LX}" y="18">before</text><text class="col-h" x="${RX}" y="18">after</text>`;
   links.forEach(l => l.from.forEach(f => l.to.forEach(t => {
+    if (pos['o:' + f] === undefined || pos['n:' + t] === undefined) return;
     const y1 = pos['o:' + f] + NH / 2, y2 = pos['n:' + t] + NH / 2, x1 = LX + NW, x2 = RX, mx = (x1 + x2) / 2;
-    svg += `<path class="link ${l.kind} ${l.by === 'agent' ? 'agent' : ''}" d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"><title>${esc(l.kind + (l.sim ? ` · ${l.sim}% similar` : '') + (l.by === 'agent' ? ' · stated by the agent, git sees no link' : ' · detected by git') + (l.note ? ` — ${l.note}` : ''))}</title></path>`;
+    svg += `<path class="link ${esc(l.kind)} ${l.by === 'agent' ? 'agent' : ''}" d="M${x1} ${y1} C${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}"><title>${esc(l.kind + (l.sim ? ` · ${l.sim}% similar` : '') + (l.by === 'agent' ? ' · stated by the session, git sees no link' : ' · detected by git') + (l.note ? `: ${l.note}` : ''))}</title></path>`;
     if (l.sim && l.from.length === 1 && l.to.length === 1) svg += `<text class="sim" x="${mx}" y="${(y1 + y2) / 2 - 4}" text-anchor="middle">${l.sim}%</text>`;
   })));
-  olds.forEach(o => svg += node(o, LX, 'o:', linkedOld.has(o.n) ? '' : 'gone', linkedOld.has(o.n) ? '' : '✕'));
-  ordered.forEach(o => svg += node(o, RX, 'n:', linkedNew.has(o.n) ? '' : 'new', linkedNew.has(o.n) ? '' : '+'));
+  olds.forEach(o => svg += node(o, LX, 'o:', linkedOld.has(o.id) ? '' : 'gone', linkedOld.has(o.id) ? '' : '✕'));
+  ordered.forEach(o => svg += node(o, RX, 'n:', linkedNew.has(o.id) ? '' : 'new', linkedNew.has(o.id) ? '' : '+'));
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Lineage: where each old file went">${svg}</svg>
     <div class="legend"><span><i style="border-color:var(--muted)"></i>kept / moved</span><span><i style="border-color:var(--accent)"></i>renamed</span>
     <span><i style="border-color:oklch(60% 0.15 300)"></i>merged</span><span><i style="border-color:oklch(62% 0.13 200)"></i>split</span>
-    <span><i style="border-color:var(--warn)"></i>rewritten</span><span><i class="dash" style="border-color:var(--muted)"></i>stated by the agent; git sees no link</span>
+    <span><i style="border-color:var(--warn)"></i>rewritten</span><span><i class="dash" style="border-color:var(--muted)"></i>stated by the session; git sees no link</span>
     <span>✕ deleted, no successor</span><span>+ new, no predecessor</span></div>`;
-  el.querySelectorAll('.node[data-p]').forEach(n => n.addEventListener('click', () => show(n.dataset.p)));
 });
 
-// review size: data-read / data-skim / data-skip lines, data-budget (default 400)
+// review size: read / skim / skip lines against the budget
 document.querySelectorAll('.sizebox[data-read]').forEach(el => {
   const r = +el.dataset.read, k = +el.dataset.skim, p = +el.dataset.skip, b = +(el.dataset.budget || 400), total = r + k + p;
   const scale = Math.max(total, b * 1.1), pct = v => (v / scale * 100).toFixed(2) + '%';
   el.insertAdjacentHTML('beforeend', `<div class="size-bar"><i class="read" style="width:${pct(r)}"></i><i class="skim" style="width:${pct(k)}"></i><i class="skip" style="width:${pct(p)}"></i>
     <span class="size-budget" style="left:${pct(b)}"><span>budget ${b}</span></span></div>
-    <div class="size-legend"><span><i style="background:var(--accent)"></i><b>${r.toLocaleString()}</b> to read</span><span><i style="background:color-mix(in oklch, var(--accent) 35%, var(--card))"></i><b>${k.toLocaleString()}</b> to skim</span><span><i style="background:var(--line)"></i><b>${p.toLocaleString()}</b> to skip</span><span>· ${r > b ? `<b style="color:var(--del-fg)">${Math.round(r / b * 10) / 10}× the budget</b>, see the <a data-p="split">split plan</a>` : 'within budget'}</span></div>`);
-  el.querySelectorAll('a[data-p]').forEach(a => a.onclick = () => show(a.dataset.p));
+    <div class="size-legend"><span><i style="background:var(--accent)"></i><b>${r.toLocaleString()}</b> to read</span><span><i style="background:color-mix(in oklch, var(--accent) 35%, var(--card))"></i><b>${k.toLocaleString()}</b> to skim</span><span><i style="background:var(--line)"></i><b>${p.toLocaleString()}</b> to skip</span><span>· ${r > b ? `<b style="color:var(--del-fg)">${Math.round(r / b * 10) / 10}× the budget</b>${D.split?.length ? ', see the <a data-p="split">split plan</a>' : ''}` : 'within budget'}</span></div>`);
 });
 // MR text: copy button
 document.querySelectorAll('.mrtext').forEach(el => {
-  const btn = el.querySelector('.copy'), text = el.querySelector('pre').innerText;
-  if (btn) btn.onclick = async () => { try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; } catch { btn.textContent = 'Select and copy'; } setTimeout(() => btn.textContent = 'Copy', 1500); };
+  const btn = el.querySelector('.copy');
+  btn.onclick = async () => { try { await navigator.clipboard.writeText(D.mrText); btn.textContent = 'Copied'; } catch { btn.textContent = 'Select and copy'; } setTimeout(() => btn.textContent = 'Copy', 1500); };
 });
-// change map: draw +/- bars scaled to the largest file
+// change map: +/- bars scaled to the largest chip
 (() => {
   const chips = [...document.querySelectorAll('.chip[data-add]')];
-  const max = Math.max(1, ...chips.map(c => +c.dataset.add + +(c.dataset.del || 0)));
+  const max = Math.max(1, ...chips.map(c => +c.dataset.add + +c.dataset.del));
   chips.forEach(c => {
-    const a = +c.dataset.add, d = +(c.dataset.del || 0), w = 90;
-    c.insertAdjacentHTML('beforeend', `<span class="bar" style="width:${Math.max(6, (a + d) / max * w)}px"><i class="a" style="flex:${a}"></i><i class="d" style="flex:${d}"></i></span><span class="n">+${a} −${d}</span>`);
+    const a = +c.dataset.add, d = +c.dataset.del;
+    c.insertAdjacentHTML('beforeend', `<span class="bar" style="width:${Math.max(6, (a + d) / max * 90)}px"><i class="a" style="flex:${a}"></i><i class="d" style="flex:${d}"></i></span><span class="n">+${a} −${d}</span>`);
   });
 })();
-// flow: one chain per "Walkthrough" list in the nav
-document.querySelectorAll('.auto-flow').forEach(box => {
-  document.querySelectorAll('nav h4').forEach(h => {
-    if (!h.textContent.trim().startsWith('Walkthrough')) return;
-    const links = [...h.nextElementSibling.querySelectorAll('a')];
-    const boxes = links.map((a, i) => {
-      const raw = a.textContent.replace(/[●!]/g, '');
-      const depth = raw.match(/^ */)[0].length / 2;
-      const cls = (a.querySelector('.chg') ? ' chg' : '') + (a.querySelector('.rev') ? ' rev' : '');
-      return `<span class="flow-box${cls}" data-p="${a.dataset.p}"><small>${depth ? '↳ '.repeat(depth).trim() : (i ? 'then' : 'entry')}</small>${raw.trim()}</span>`;
-    });
-    box.insertAdjacentHTML('beforeend', `<div class="flow"><div class="flow-title">${h.textContent}</div><div class="flow-row">${boxes.join('<span class="flow-arrow">→</span>')}</div></div>`);
-  });
-});
-// decision grid: door × who, from each decision panel's badges
-document.querySelectorAll('.auto-decisions').forEach(box => {
-  const ds = [...document.querySelectorAll('.panel[id^="p-d"]')].map(p => ({
-    p: p.id.slice(2), t: p.querySelector('h1').textContent.trim(),
-    one: !!p.querySelector('.badge.one-way'), agent: !!p.querySelector('.badge.agent') }));
-  const cell = (one, agent, hot) => `<div class="cell${hot ? ' hot' : ''}">${hot ? '<span class="tag">review hardest</span>' : ''}${
-    ds.filter(d => d.one === one && d.agent === agent).map(d => `<a data-p="${d.p}">${d.p.slice(1)} · ${d.t}</a>`).join('')}</div>`;
-  box.innerHTML = `<div class="dgrid"><span></span><span class="h">you decided</span><span class="h">agent default</span>
-    <span class="h rh">one-way</span>${cell(true, false)}${cell(true, true, true)}
-    <span class="h rh">two-way</span>${cell(false, false)}${cell(false, true)}</div>`;
-});
-// timeline: rows of events and spans on one shared axis — dates (YYYY-MM-DD), or plain numbers with data-unit (e.g. "s")
+// timeline: rows of events and spans on one shared axis; dates (YYYY-MM-DD), or plain numbers with data-unit (e.g. "s")
 document.querySelectorAll('.timeline[data-rows]').forEach(el => {
   const rows = JSON.parse(el.dataset.rows), unit = el.dataset.unit, nowAt = el.dataset.now;
   const val = v => unit ? +v : new Date(v + 'T00:00:00Z').getTime();
@@ -765,33 +605,39 @@ document.querySelectorAll('.timeline[data-rows]').forEach(el => {
   let svg = '';
   rows.forEach((r, i) => {
     const y = 40 + i * H;
-    svg += `<text x="10" y="${y + 4}" font-weight="600">${r.label}</text><line class="axis" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/>`;
+    svg += `<text x="10" y="${y + 4}" font-weight="600">${esc(r.label)}</text><line class="axis" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/>`;
     (r.spans || []).forEach(s => {
       const a = x(s.from), b = x(s.to), t = s.tone || 'neutral';
-      svg += `<path class="span ${t}" d="M${a} ${y + 12} v6 H${b} v-6"/><text class="muted-t" x="${(a + b) / 2}" y="${y + 32}" text-anchor="middle">${s.text}</text>`;
+      svg += `<path class="span ${esc(t)}" d="M${a} ${y + 12} v6 H${b} v-6"/><text class="muted-t" x="${(a + b) / 2}" y="${y + 32}" text-anchor="middle">${esc(s.text)}</text>`;
     });
     r.events.forEach((e, j) => {
       const cx = x(at(e)), t = e.tone || 'neutral', up = j % 2 === 0 ? -12 : -24;
-      svg += `<circle class="${t}" cx="${cx}" cy="${y}" r="5"/><text x="${cx}" y="${y + up}" text-anchor="middle">${e.text} <tspan class="muted-t">${fmt(at(e))}</tspan></text>`;
+      svg += `<circle class="${esc(t)}" cx="${cx}" cy="${y}" r="5"/><text x="${cx}" y="${y + up}" text-anchor="middle">${esc(e.text)} <tspan class="muted-t">${fmt(at(e))}</tspan></text>`;
     });
   });
-  if (nowAt) svg += `<line class="now" x1="${x(nowAt)}" x2="${x(nowAt)}" y1="14" y2="${rows.length * H + 10}"/><text x="${x(nowAt) + 4}" y="12" class="muted-t">${el.dataset.nowLabel || 'today'}</text>`;
+  if (nowAt) svg += `<line class="now" x1="${x(nowAt)}" x2="${x(nowAt)}" y1="14" y2="${rows.length * H + 10}"/><text x="${x(nowAt) + 4}" y="12" class="muted-t">today</text>`;
   el.innerHTML = `<svg viewBox="0 0 ${W} ${rows.length * H + 20}" role="img">${svg}</svg>`;
 });
+
+// ---------- navigation ----------
 function show(p) {
+  if (!document.getElementById('p-' + p)) return;
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.p === p));
   document.querySelectorAll('.panel').forEach(x => x.classList.toggle('on', x.id === 'p-' + p));
   history.replaceState(null, '', '#' + p);
   window.scrollTo(0, 0);
   drawDiagrams();
 }
-document.querySelectorAll('nav a, main a[data-p], main [data-p]:not(.rv)').forEach(a => a.onclick = () => show(a.dataset.p));
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-p]');
+  if (t) show(t.dataset.p);
+});
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
   const panel = b.closest('.panel');
   panel.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
   panel.querySelectorAll('[data-tab]').forEach(t => t.hidden = t.dataset.tab !== b.dataset.t);
 });
-const fromHash = () => { const p = location.hash.slice(1); if (p && document.getElementById('p-' + p)) show(p); };
+const fromHash = () => { const p = location.hash.slice(1); if (p) show(p); };
 addEventListener('hashchange', fromHash);
 fromHash();
 // Mermaid measures nothing inside a hidden panel, so each diagram is drawn when its panel opens.
