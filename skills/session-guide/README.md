@@ -1,98 +1,175 @@
 # session-guide
 
-A [Claude Code](https://claude.com/claude-code) skill that turns an agent's coding session into a
-**guide you can review and own**: what the context was, which decisions were taken and why, what the
-alternatives were, a walkthrough from entrypoint to persistence, and the proof that it works. It
-also turns that guide into a merge request your colleagues can get through.
+A skill for [Claude Code](https://claude.com/claude-code). It explains the code that the agent
+changed, so you can check it and take ownership of it.
 
-Working with agents shouldn't mean giving up control of your code. The diff shows *what* changed;
-only the session knows *why*, what else was considered, and what was tried and abandoned. This
-skill captures that while the agent still has it in context.
+The diff shows *what* changed. It does not show *why*, which other options there were, or what the
+agent tried and gave up on. Only the conversation knows that. This skill writes it down before the
+conversation ends.
 
-## What a guide looks like
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/session-guide-overview-dark.png">
+  <img alt="The summary page of a guide" src="../../docs/screenshots/session-guide-overview-light.png">
+</picture>
 
-One self-contained HTML page per session or ticket, with a sidebar and two ways in:
+## What you get
 
-- **Walkthrough**: one real request through the changed code, in execution order. Each stop shows
-  `path:line`, why the code is shaped that way, pseudocode first and the real change folded
-  underneath.
-- **Decision deep dives**: one page per decision, small ones included. Each has the real reason,
-  the rejected alternatives, who decided (you, or the agent by default), whether it's a one-way or
-  two-way door, and every code change that implements it.
+You get one web page for each session or ticket. It has two main parts:
 
-The overview page is visual first:
+- **Walkthrough**: follows one real request through the changed code, step by step. Each step
+  shows the file and line, explains why the code looks this way, and shows the change.
+- **Decisions**: one page for each decision, also the small ones. Each page shows:
+  - the reason;
+  - the other options, and why they were not chosen;
+  - who decided: you, or the agent on its own;
+  - whether the decision is easy or hard to undo;
+  - all the code that belongs to it.
 
-| View | What it shows |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/session-guide-walkthrough-dark.png">
+  <img alt="A step of the walkthrough, with pseudocode" src="../../docs/screenshots/session-guide-walkthrough-light.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/session-guide-decision-dark.png">
+  <img alt="A decision page: why, the other options, and the code" src="../../docs/screenshots/session-guide-decision-light.png">
+</picture>
+
+The first page is a summary with pictures:
+
+| Part | What it shows |
 |---|---|
-| **Where we are** | The system as C4 containers and components, with what this change touches highlighted |
-| **Walkthrough chain** | The request path as boxes, changed steps marked |
-| **Change map** | Every changed file in its layer, with +/− bars, each linked to its explanation |
-| **Decisions at a glance** | A grid of door × who decided. The "one-way, agent default" cell is where to look hardest |
-| **Evidence** | Before/after as a picture: a timeline, a state diagram, a screenshot, and the test that pins it |
-| **Merge danger** | Door and blast radius |
+| **Where we are** | The parts of the system, with the changed parts marked |
+| **Walkthrough chain** | The path of the request, with the changed steps marked |
+| **Change map** | Every changed file, with the number of added and removed lines |
+| **Decisions** | All decisions in a grid. Look hardest at the ones that are hard to undo *and* that the agent took on its own |
+| **Evidence** | Before and after, as a picture, and the test that proves it |
+| **Merge danger** | How hard the change is to undo, and how much of the system it affects |
 
-Plus:
+There is more:
 
-- **Contracts**: every changed signature, type, endpoint and schema, with no bodies. Big ones get a
-  **shape table**: before and after side by side, each member marked added, removed, type changed or
-  renamed.
-- **Review this**: one card per point, most severe first. Each states the claim, tags its kind
-  (doc ≠ code, race, untested, one-way door, agent default), shows the **proof** (docs beside code,
-  or a concrete scenario step by step with the step where it goes wrong marked), and ends with the
-  decision that's yours. Points that were checked and hold stay visible as green cards. Tick a card
-  off when you've reviewed it.
+- **Contracts**: every changed method signature, type, endpoint and database schema. For big ones,
+  a table shows before and after side by side.
+- **Review this**: a list of things to check, the most important first. Each card says what the
+  risk is, shows the proof, and asks for your decision. Things that were checked and are fine show
+  as green cards. You can tick a card when you are done with it.
 
-### Refactoring mode
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/session-guide-review-dark.png">
+  <img alt="Review cards, the most important first" src="../../docs/screenshots/session-guide-review-light.png">
+</picture>
 
-When files were deleted, created, renamed, split or merged, three more panels:
+### When you refactor
 
-- **Lineage**: old files on the left, new on the right, joined by what happened (kept, moved,
-  renamed, merged, split, rewritten). Links git detected are solid; links only the session knows are
-  dashed. A deleted file with no successor and a new file with no predecessor stand out. Below it,
-  **where did it go**, by responsibility rather than by file.
-- **Changed in transit**: each moved piece before and after, with the lines that changed meaning
-  marked. Pieces that moved unchanged say so in one line.
-- **Behaviour**: a refactoring claims nothing changes. A ledger of what stayed the same, what
-  changed on purpose and what was dropped, plus the tests mapped old → new.
+When files were deleted, added, renamed, split or merged, you get three more parts:
 
-Git can't see a merge or a rewrite under a new name, so record the lineage **during** the work
-(`/session-guide ticket` at the end of every session), not afterwards.
+- **Lineage**: old files on the left, new files on the right, with lines between them that show
+  what happened. A deleted file with no new place stands out.
+- **Changed in transit**: code that moved, before and after. Lines that now do something different
+  are marked.
+- **Behaviour**: a refactoring should not change what the code does. This part lists what stayed
+  the same, what changed on purpose, and what was removed. It also shows which new test replaces
+  which old test.
 
-### Merge request mode
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../../docs/screenshots/session-guide-lineage-dark.png">
+  <img alt="Lineage: old files on the left, new files on the right" src="../../docs/screenshots/session-guide-lineage-light.png">
+</picture>
 
-- **Review size**: every changed line sorted into *read* / *skim* / *skip*, against a budget of 400
-  lines to read, next to a **Ship / Show / Ask** call.
-- **Read in this order**: where a reviewer should start, and what they can skip.
-- **Split plan**: when it's over budget or mixes refactoring with behaviour, the same work as a stack
-  of smaller MRs in a safe merge order.
-- **MR description**: the guide condensed into Markdown for GitLab or GitHub, with a Mermaid diagram
-  and the review focus as checkboxes.
-- **Since last review**: after a review round, `git range-diff` against the version reviewers saw.
-  It shows which commits are unchanged, changed or new, and where each finding was answered.
+Git cannot always see that two files were merged, or that a file was rewritten under a new name.
+So run `/session-guide ticket` at the end of **every** session, not only at the end of the ticket.
 
-## Install
+### For the merge request
 
-With the [`skills`](https://github.com/vercel-labs/skills) CLI, into every project on this machine:
+- **Review size**: sorts every changed line into *read*, *skim* or *skip*. The goal is at most 400
+  lines to read.
+- **Read in this order**: where the reviewer should start, and what they can skip.
+- **Split plan**: when the change is too big, a plan to split it into smaller merge requests.
+- **Description**: a short text for GitLab or GitHub, with a diagram and a checklist for the
+  reviewer.
+- **Since last review**: after a review, shows what changed since the version the reviewers saw,
+  and where each comment was answered.
+
+## How to use
+
+Run the skill yourself at the end of a session, before you close the conversation:
+
+| Command | What it does |
+|---|---|
+| `/session-guide session` | A guide to what changed in this session |
+| `/session-guide ticket` | A guide to the whole branch, over all sessions |
+| `/session-guide mr` | The text for your merge request |
+| `/session-guide reviewed` | Remembers which version the reviewers have seen. This is a local file; it is never pushed |
+| `/session-guide quiz` | 3 to 5 questions, one at a time, to check that you understand the change |
+
+The skill writes the guides to `.claude/session-guides/` in your repo. For each guide you get:
+
+- `<name>.html`: the page;
+- `<name>.mr.md`: the merge request text;
+- a folder `<name>/` with the data behind the page.
+
+The skill checks that git ignores this folder. It asks you before it writes anywhere else.
+
+Open the page in a browser. Links inside the page work best with a small web server:
+
+```bash
+python3 -m http.server 4310 --directory .claude/session-guides
+```
+
+The skill does not run on its own, on purpose. After the session ends, the conversation is gone,
+so an automatic run would come too late.
+
+### Why you can trust the guide
+
+- **A script checks the guide against the code** before it makes the page. For example: a changed
+  file that the guide does not explain, or a line number that does not exist. If there is a
+  problem, there is no page.
+- **The code on the page comes from git.** The agent does not type it again, so it is always the
+  real code.
+- **The agent checks each step of the walkthrough** in the code. If it cannot confirm a step, the
+  step is marked *unverified*.
+- **Guesses are marked** as *assumed*.
+- **Decisions that the agent took on its own are marked** *agent default*, and they go on the
+  review list.
+- **It uses what your repo already has.** It links to your ADRs and `CONTEXT.md` instead of
+  repeating them. For a big architecture decision, it suggests a new ADR.
+
+### Why it is cheap
+
+The agent does not write the page. It writes only data: the *why*. Scripts do the rest: they count
+lines, find renames, draw the change map and copy the code from git. The agent only reads the code
+that a reviewer must read.
+
+A big change is more than 50 files or more than 3000 changed lines. The skill splits it into
+smaller jobs, and a separate agent does each job. The main agent reads only their results, not all
+the code.
+
+## How to install
+
+You need the [`skills`](https://github.com/vercel-labs/skills) tool, `git`, and `python3`. This
+command installs the skill for all your projects:
 
 ```bash
 npx skills add stainii/stijnhooft-skills --skill session-guide -g
 ```
 
-Or into the current project only (`.claude/skills/`, which you can commit so your team gets it too):
+Without `-g`, it installs the skill only in this project, in `.claude/skills/`. You can commit that
+folder, so your team gets the skill too.
 
-```bash
-npx skills add stainii/stijnhooft-skills --skill session-guide
-```
+Useful options:
 
-`-a claude-code` limits the install to Claude Code, and `--copy` copies the files instead of
-symlinking them. The CLI installs the whole skill folder: `SKILL.md`, `template.html`,
-`MERGE-REQUEST.md`, `QUIZ.md` and this README. To update later:
+- `-a claude-code`: install only for Claude Code.
+- `--copy`: copy the files instead of linking them.
+
+To get the newest version:
 
 ```bash
 npx skills update session-guide
 ```
 
-### From a clone, to work on the skill itself
+## How to contribute
+
+Get the code, and link the skill into Claude Code. Then Claude Code uses your changes right away.
 
 ```bash
 git clone https://github.com/stainii/stijnhooft-skills.git ~/projecten/stijnhooft-skills
@@ -102,63 +179,43 @@ git clone https://github.com/stainii/stijnhooft-skills.git ~/projecten/stijnhoof
 ln -s ~/projecten/stijnhooft-skills/skills/session-guide ~/.claude/skills/session-guide
 ```
 
-Every edit in the clone is then live in Claude Code. A local path works with the CLI too:
-`npx skills add ~/projecten/stijnhooft-skills --skill session-guide`.
+### Files
 
-## Use
-
-Run it yourself at the end of a session, while the agent still has the conversation:
-
-| Command | Does |
+| File | What it is |
 |---|---|
-| `/session-guide session` | A guide to what this session changed |
-| `/session-guide ticket` | A guide to the whole branch, rewritten as one story across sessions |
-| `/session-guide mr` | The merge request description, written next to the guide |
-| `/session-guide reviewed` | Marks the branch head as the version reviewers saw (local file, never pushed) |
-| `/session-guide quiz` | 3–5 questions on the change, one at a time, to check you really own it |
+| `SKILL.md` | The steps the agent follows, and the words it uses |
+| `guide.schema.ts` | The format of `guide.json`, the only file the agent writes |
+| `scripts/gather.py` | Measures the change and writes `facts.json`: files, lines, renames, jobs |
+| `scripts/build.py` | Checks the guide against the code, then makes the page and the merge request text |
+| `scripts/guide.py`, `source.py`, `views.py` | The parts of `build.py` |
+| `scripts/files.py` | Lists the changed files, for each job |
+| `template.html` | The design of the page, in light and dark mode. Do not change it for one guide |
+| `SUBAGENTS.md` | Only for big changes: how to split the work over several agents |
+| `REFACTORING.md` | Only for a refactoring |
+| `MERGE-REQUEST.md` | Only for `mr` and `reviewed` |
+| `QUIZ.md` | Only for `quiz` |
 
-Guides are written to `.claude/session-guides/` in the repo. The skill checks that this folder is
-gitignored and asks before writing anywhere else. Open them in a browser. A static server makes
-in-page links and hashes behave best:
+The page is one HTML file. It loads fonts and diagrams from the internet. Without internet, it
+still works, but without the diagrams.
+
+### Tests
+
+The tests are in [`tests/session-guide`](../../tests/session-guide). They are not in the skill
+folder, so they are not installed. Run them from the main folder of the repo:
 
 ```bash
-python3 -m http.server 4310 --directory .claude/session-guides
+python3 -m unittest discover -s tests/session-guide
 ```
 
-It is manual on purpose. A hook that runs after the session has ended no longer has the
-conversation, and a reminder on every turn is noise.
+## Thanks to
 
-## How it stays honest
-
-- **Every call-tree edge is checked against the code** (`grep` the caller for the callee) before it
-  goes into the guide. Anything that couldn't be confirmed is marked *unverified*.
-- **Assumptions are labelled** as *assumed*, never stated as fact.
-- **Decisions the agent took on its own are badged** *agent default* and put on the review list.
-- It uses the repo's own records: it links ADRs and `CONTEXT.md` terms instead of restating them,
-  and proposes an ADR for architectural decisions.
-
-## Files
-
-| File | Role |
-|---|---|
-| `SKILL.md` | The steps the agent follows, and the vocabulary (*door*, *blast radius*, *agent default*, *smallest view*) |
-| `template.html` | The page: Bento-style theme (light and dark), every component, no build step. The agent fills it in |
-| `MERGE-REQUEST.md` | `mr` and `reviewed`, loaded only for those |
-| `QUIZ.md` | `quiz`, loaded only for that |
-
-The page needs no build step. Fonts (Geist) and Mermaid come from CDNs and the page still renders
-without them, apart from the Mermaid diagrams.
-
-## Credits and further reading
-
-- The visual-first vocabulary (call trees, file trees and pseudocode as diffs) comes from
-  HumanLayer's [show-me](https://www.humanlayer.com/blog/show-me-skill) skill and Matt Pocock's
-  `/pr` skill built on it. *Evidence* and *Merge danger* come from the latter.
-- Refactoring kept apart from behaviour changes: Chromium's
-  [CL tips](https://chromium.googlesource.com/chromium/src.git/+show/HEAD/docs/cl_tips.md), after
-  Google's *Small CLs*.
-- The 200–400 line review budget: the
-  [SmartBear/Cisco study](https://agileconnection.com/article/largest-case-study-code-reviews-ever).
-  One company's data, so a guideline rather than a law.
-- [Ship / Show / Ask](https://martinfowler.com/tags/version%20control.html), Rouan Wilsenach.
-- [`git range-diff`](https://www.git-scm.com/docs/git-range-diff) for re-review after a rebase.
+- The pictures (call trees, file trees, pseudocode) come from HumanLayer's
+  [show-me](https://www.humanlayer.com/blog/show-me-skill) skill and Matt Pocock's `/pr` skill.
+  *Evidence* and *Merge danger* come from Matt Pocock's skill.
+- Keeping refactoring apart from other changes: Chromium's
+  [CL tips](https://chromium.googlesource.com/chromium/src.git/+show/HEAD/docs/cl_tips.md).
+- The limit of 200 to 400 lines per review: a
+  [study by SmartBear and Cisco](https://agileconnection.com/article/largest-case-study-code-reviews-ever).
+  It is data from one company, so see it as a guideline.
+- [Ship / Show / Ask](https://martinfowler.com/tags/version%20control.html), by Rouan Wilsenach.
+- [`git range-diff`](https://www.git-scm.com/docs/git-range-diff), to review again after a rebase.

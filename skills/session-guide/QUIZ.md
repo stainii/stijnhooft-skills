@@ -1,7 +1,7 @@
 # Quiz
 
-Test the user's ownership of the change, in chat. Source the questions from the guide for the
-current branch in `.claude/session-guides/` and from the diff; if no guide exists, use the diff and
+Test the user's ownership of the change, in chat. Source the questions from the guide's `guide.json`
+for the current branch in `.claude/session-guides/` and from the diff; if no guide exists, use the diff and
 the conversation.
 
 Ask 3–5 questions, one at a time, each answerable only by someone who understands the code:
