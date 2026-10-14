@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Collect the mechanical facts of a change set into <guide-dir>/facts.json.
 
-usage: gather.py <guide-dir> (--base <rev> | --ticket) [--reviewed <sha>]
+usage: gather.py <guide-dir> (--base <rev> | --ticket | --against <branch>) [--reviewed <sha>]
 """
 import argparse
 import json
@@ -16,7 +16,8 @@ from pathlib import Path
 
 
 def git(*args, cwd=".", env=None):
-    return subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True).stdout
+    return subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace").stdout
 
 
 def git_succeeds(*args, cwd="."):
@@ -51,7 +52,7 @@ def snapshot(root, exclude=None):
 
 # First guesses only; the agent overrides any of them in guide.json.
 GENERATED = re.compile(r"(^|/)(generated|gen|dist|build|target|vendor|node_modules|__snapshots__)/"
-                       r"|\.(min\.js|map|snap|lock)$|(^|/)(package-lock\.json|pnpm-lock\.yaml|go\.sum)$")
+                       r"|\.(min\.js|map|snap|lock)$|(^|/)(package-lock\.json|[^/]+-lock\.json|pnpm-lock\.yaml|go\.sum)$")
 TEST = re.compile(r"(^|/)(tests?|__tests__|spec|testdata|fixtures?)/|(Test|Tests|IT|Spec)\.\w+$"
                   r"|[._-](test|spec)\.\w+$|(^|/)test_[^/]+$|_test\.\w+$")
 SKIM = re.compile(r"\.(md|adoc|rst|txt|ya?ml|json|toml|properties|ini|xml|gradle|cfg|conf)$"
@@ -205,6 +206,32 @@ def default_branch(root):
     sys.exit("gather.py: no default branch found (origin/HEAD, main, master, develop); pass --base")
 
 
+def stacked_on(base, root):
+    """Other branches whose tip lies between the base and HEAD: this branch builds on them, so comparing with the
+    base would take their work in too."""
+    head = git("rev-parse", "HEAD", cwd=root).strip()
+    out = git("for-each-ref", "--merged", "HEAD", "--no-merged", base, "--format=%(objectname) %(refname:short)",
+              "refs/heads", "refs/remotes", cwd=root)
+    names = (line.split(" ", 1) for line in out.splitlines())
+    return sorted({name for sha, name in names if sha != head and not name.endswith("/HEAD")})
+
+
+SUGGESTED_GROUPS = [  # files that rarely need a word of their own
+    ("Docs", "skim", re.compile(r"^docs?/"), lambda p: p.split("/", 1)[0] + "/**"),
+    ("Lockfiles", "skip", re.compile(r"(^|/)([^/]+-lock\.json|pnpm-lock\.yaml|go\.sum|[^/]+\.lock)$"),
+     lambda p: "**/" + p.rsplit("/", 1)[-1]),
+]
+
+
+def suggested_groups(files):
+    out = []
+    for name, tier_name, rx, pattern in SUGGESTED_GROUPS:
+        match = sorted({pattern(f["path"]) for f in files if rx.search(f["path"])})
+        if match:
+            out.append({"name": name, "match": match, "tier": tier_name})
+    return out
+
+
 def guides_folder(guide_dir, root):
     """The folder holding every guide and its output, relative to the repo: never part of the change."""
     try:
@@ -229,7 +256,8 @@ def collect(base, root, env):
         totals["del"] += f["del"]
         totals[f["tier"]] += churn(f)
     large = len(files) > LARGE_FILES or churn(totals) > LARGE_LINES
-    return {"base": base, "files": files, "totals": totals, "large": large, "jobs": jobs(files)}
+    return {"base": base, "files": files, "totals": totals, "large": large, "jobs": jobs(files),
+            "groups": suggested_groups(files)}
 
 
 def main(argv=None):
@@ -238,18 +266,24 @@ def main(argv=None):
     scope = ap.add_mutually_exclusive_group(required=True)
     scope.add_argument("--base", help="session scope: the commit the session started from")
     scope.add_argument("--ticket", action="store_true", help="the branch since its merge-base with the default branch")
+    scope.add_argument("--against", help="the branch since its merge-base with this branch: for a branch built on another")
     ap.add_argument("--reviewed", help="the sha last marked reviewed: adds the since-last-review rows")
     args = ap.parse_args(argv)
     out = Path(args.guide_dir)
     root = Path(git("rev-parse", "--show-toplevel").strip())
-    if args.ticket:
-        args.base = git("merge-base", default_branch(root), "HEAD", cwd=root).strip()
+    against = default_branch(root) if args.ticket else args.against
+    if against:
+        args.base = git("merge-base", against, "HEAD", cwd=root).strip()
     with snapshot(root, guides_folder(out, root)) as env:
         facts = collect(args.base, root, env)
+    facts["against"] = against
+    if args.ticket:
+        facts["stackedOn"] = stacked_on(args.base, root)
     if args.reviewed:
         facts["since"] = since(args.base, args.reviewed, root)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "facts.json").write_text(json.dumps(facts, indent=1))
+    (out / "facts.json").write_text(json.dumps(facts, indent=1), encoding="utf-8")
+    sys.stdout.reconfigure(encoding="utf-8")
     print(summary(facts, out / "facts.json"))
 
 
@@ -257,12 +291,23 @@ def summary(facts, path):
     """What the agent needs to plan, in a few lines; the full list stays in facts.json."""
     t, files = facts["totals"], facts["files"]
     count = lambda st: sum(f["status"] == st for f in files)
-    lines = [f"{path}",
+    base = f"base {facts['base'][:12]}" + (f" (merge-base with {facts['against']})" if facts.get("against") else "")
+    stacked = facts.get("stackedOn")
+    if stacked:
+        # a wrong base means a wrong scope: no jobs until the user has confirmed it
+        return "\n".join([
+            f"{path}", base,
+            f"CHECK BASE: this branch builds on {', '.join(stacked)}. Ask the user what to compare with, then run again "
+            f"with --against <branch>, or with --base {facts['base'][:12]} to keep this base.",
+            f"{t['files']} files, +{t['add']} -{t['del']} with this base"])
+    lines = [f"{path}", base,
              f"{t['files']} files, +{t['add']} -{t['del']} · read {t['read']} · skim {t['skim']} · skip {t['skip']}"
              + (" · LARGE" if facts["large"] else ""),
              f"added {count('A')} · deleted {count('D')} · renamed {count('R')} · copied {count('C')}",
              "jobs (one subagent each in large mode): " + " | ".join(
                  f"{i}: {j['read']} read lines in {', '.join(j['modules'])}" for i, j in enumerate(facts["jobs"], 1))]
+    if facts.get("groups"):
+        lines.append("suggested groups: " + json.dumps(facts["groups"]))
     if not facts["large"]:
         lines += [f"read: {f['path']}" for f in files if f["tier"] == "read"]
     if "since" in facts:

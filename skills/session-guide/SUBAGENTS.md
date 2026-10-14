@@ -31,6 +31,7 @@ only these keys, each holding only what concerns your modules:
   with grep before writing it down; write "(unverified)" in the text of one you could not confirm.
 - decisions: [{"id", "hunks": [{"at", "text"}]}] for every hunk that implements one of these:
   <id: title, one per line>
+  Leave out a decision with no hunk in your job's files: another job holds its code.
   A decision you notice that is not listed: a review card "agent default?" with its hunk.
 - contracts: every changed signature, type, endpoint, event and schema, with who depends on it.
 - review: a card for each doc/code mismatch, untested change, deleted test without a successor,
@@ -40,7 +41,8 @@ only these keys, each holding only what concerns your modules:
   deletion with no successor, whereTo, transit, behaviour, tests. See <skill>/REFACTORING.md.
 
 A hunk is a `path:from-to` reference into the file as it is now: never paste code.
-Check with: python3 <skill>/scripts/build.py <guide-dir>
-Done when no problem it prints names your part or a file of your job. Reply with one line: the
+Check with: python3 <skill>/scripts/build.py <guide-dir> --part parts/job-<N>.json
+It prints only the problems of your part and your job's files; never stub other keys to silence it.
+Done when it prints ok. Reply with one line: the
 part's path and how many stops, hunks and cards it holds.
 ```

@@ -195,6 +195,40 @@ class GatherTest(unittest.TestCase):
 
         self.assertEqual((facts["base"], list(by_path(facts))), (self.base, ["src/app/Feature.java"]))
 
+    def stack_two_feature_branches(self):
+        self.repo.git("checkout", "-q", "-b", "feature-a")
+        self.repo.write("src/app/A.java", lines(2, "a"))
+        self.repo.commit()
+        self.repo.git("checkout", "-q", "-b", "feature-b")
+        self.repo.write("src/app/B.java", lines(2, "b"))
+        self.repo.commit()
+
+    def test_ticket_scope_on_a_branch_built_on_another_asks_to_check_the_base_before_planning_jobs(self):
+        self.stack_two_feature_branches()
+
+        out = self.repo.run("gather.py", str(self.repo.root / "guides/g"), "--ticket").stdout
+
+        self.assertIn(f"base {self.base[:12]} (merge-base with main)", out)
+        self.assertIn("CHECK BASE: this branch builds on feature-a.", out)
+        self.assertNotIn("jobs", out)
+
+    def test_against_a_branch_compares_with_its_merge_base(self):
+        self.stack_two_feature_branches()
+
+        facts = self.repo.gather("--against", "feature-a")
+
+        self.assertEqual(list(by_path(facts)), ["src/app/B.java"])
+        self.assertNotIn("stackedOn", facts)
+
+    def test_suggests_a_group_for_docs_and_one_for_lockfiles(self):
+        self.repo.write("docs/adr/0001-x.md", lines(2))
+        self.repo.write("web/package-lock.json", "{}\n")
+
+        facts = self.repo.gather("--base", self.base)
+
+        self.assertEqual(facts["groups"], [{"name": "Docs", "match": ["docs/**"], "tier": "skim"},
+                                           {"name": "Lockfiles", "match": ["**/package-lock.json"], "tier": "skip"}])
+
     def test_since_a_reviewed_version_each_commit_is_unchanged_changed_added_or_dropped(self):
         self.repo.write("src/app/A.java", lines(20, "a"))
         self.repo.commit("A")

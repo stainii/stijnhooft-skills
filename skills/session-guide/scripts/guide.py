@@ -12,17 +12,21 @@ PANEL_LINK = re.compile(r"\]\(#([\w-]+)\)")
 
 def load(guide_dir):
     """guide.json with every parts/*.json merged into it."""
-    guide = json.loads((guide_dir / "guide.json").read_text())
+    guide = json.loads((guide_dir / "guide.json").read_text(encoding="utf-8"))
     parts = guide_dir / "parts"
     for part in sorted(parts.glob("*.json")) if parts.is_dir() else []:
-        guide = merge(tag(json.loads(part.read_text()), f"parts/{part.name}"), guide)
+        guide = merge(tag(json.loads(part.read_text(encoding="utf-8")), f"parts/{part.name}"), guide)
     return guide
 
 
-def tag(node, origin_name):
+PATH_MAPS = {"files", "gone"}  # keyed by path: a "_from" key there would read as one more path
+
+
+def tag(node, origin_name, path_map=False):
     """Mark every object from a part with where it came from, so a problem names the file to fix."""
     if isinstance(node, dict):
-        return {**{k: tag(v, origin_name) for k, v in node.items()}, "_from": origin_name}
+        tagged = {k: tag(v, origin_name, k in PATH_MAPS) for k, v in node.items()}
+        return tagged if path_map else {**tagged, "_from": origin_name}
     if isinstance(node, list):
         return [tag(v, origin_name) for v in node]
     return node

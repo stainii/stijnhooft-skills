@@ -4,6 +4,7 @@
 //
 // Text  plain text, never HTML: `code`, **bold**, *italic* and [label](#id) links to a panel are rendered.
 // Ref   "path:line" or "path:from-to" in the file as it is now; for a deleted file, in the file at the base.
+//       Always with line numbers: a bare path is not a Ref.
 // Hunk  a Ref whose range holds changed lines: build.py pastes in the real diff lines. Keep ranges tight.
 // Code  a Ref read as plain lines (no diff): Transit.from is read at the base, Transit.to as it is now.
 // Id    [a-z0-9-]+, unique. Panels: overview, contracts, review, readorder, split, since, mr, lineage, transit,
@@ -24,7 +25,9 @@ interface Guide {
   callTree?: string;                   // the changed flow as a call tree, +/- marking added and removed calls
   files?: { [path: string]: { panel?: Id; tier?: Tier; layer?: string; review?: boolean } }; // overrides facts.json
   groups?: { name: string; match: string[]; panel?: Id; tier?: Tier; layer?: string }[]; // globs (** allowed): files explained as one chip
-  evidence: { timeline?: Timeline; mermaid?: string; before?: string; after?: string; test?: Ref; notCovered: Text };
+  evidence: { timeline?: Timeline; mermaid?: string; before?: string; after?: string;
+              test?: Ref;              // path:line of the test that pins it, not just its file
+              notCovered: Text };
   danger: { door: Door; why: Text; blast: Text };
   sessions: { date: string; text: Text }[]; // ticket scope: keep the earlier sessions' lines
   contracts: Contract[];
@@ -52,7 +55,7 @@ interface Stop {
 
 interface Decision {
   id: Id; title: string; door: Door; by: "you" | "agent"; // agent = an agent default: also gets a review card
-  why: Text;                           // the real reason, from the session
+  why: Text;                           // the real reason, from the session, or from the record it came from (ADR, ticket)
   alt: Text;                           // each alternative and why it lost, or "none considered"
   hunks: { at: Hunk; text: Text }[];   // every hunk that implements it
 }

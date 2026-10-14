@@ -157,6 +157,38 @@ class BuildTest(unittest.TestCase):
 
         self.assertProblem(self.build(minimal()), "decision d7 (parts/billing.json): no hunks")
 
+    def test_a_part_may_override_files(self):
+        self.repo.write("src/billing/Invoice.java", lines(3, "invoice"))
+        self.repo.write_part("job-1", {"files": {"src/billing/Invoice.java": {"panel": "d1"}},
+                                       "readOrder": [{"tier": "read", "files": ["src/billing/**"], "why": "w"}]})
+
+        r = self.build(minimal())
+
+        self.assertEqual(r.returncode, 0, r.stdout)
+
+    def build_part(self, guide, part):
+        self.repo.gather("--base", self.base)
+        self.repo.write_guide(guide)
+        self.repo.write_part("job-1", part)
+        return self.repo.run("build.py", str(self.repo.root / "guides/g"), "--part", "parts/job-1.json")
+
+    def test_a_part_can_be_checked_before_the_guide_is_complete(self):
+        guide = {"decisions": [{"id": "d1", "title": "Fold", "door": "two-way", "by": "you", "why": "w",
+                                "alt": "none considered", "hunks": []}]}
+        part = {k: minimal()[k] for k in ("flows", "readOrder")}
+
+        r = self.build_part(guide, part)
+
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertTrue(r.stdout.startswith("ok ") and r.stdout.strip().endswith("guides/g/parts/job-1.json"), r.stdout)
+        self.assertFalse((self.repo.root / "guides/g.html").exists())
+
+    def test_checking_a_part_prints_its_problems(self):
+        part = {"flows": [{"title": "F", "stops": [{"id": "w9", "at": "src/app/Service.java", "title": "t", "text": "t"}]}]}
+
+        self.assertProblem(self.build_part({}, part),
+                           "stop w9 (parts/job-1.json): 'src/app/Service.java' needs line numbers")
+
     def test_the_review_size_counts_lines_per_tier_after_the_guides_overrides(self):
         self.repo.write("src/app/Mapper.java", lines(30, "mapper"))
         guide = minimal(files={"src/app/Mapper.java": {"tier": "skim", "panel": "d1"}})
