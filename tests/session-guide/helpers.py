@@ -23,12 +23,12 @@ class GitSandbox:
 
     def git(self, *args):
         return subprocess.run(["git", *args], cwd=self.root, check=True,
-                              capture_output=True, text=True).stdout.strip()
+                              capture_output=True, text=True, encoding="utf-8").stdout.strip()
 
     def write(self, path, text):
         p = self.root / path
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(text)
+        p.write_text(text, encoding="utf-8")
 
     def move(self, old, new):
         (self.root / new).parent.mkdir(parents=True, exist_ok=True)
@@ -51,7 +51,7 @@ class GitSandbox:
     def gather(self, *args, guide="guides/g"):
         r = self.run("gather.py", str(self.root / guide), *args)
         assert r.returncode == 0, r.stderr
-        return json.loads((self.root / guide / "facts.json").read_text())
+        return json.loads((self.root / guide / "facts.json").read_text(encoding="utf-8"))
 
     def write_guide(self, data, guide="guides/g"):
         self.write(f"{guide}/guide.json", json.dumps(data))

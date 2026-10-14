@@ -22,7 +22,7 @@ def minimal(**overrides):
 
 
 def page_data(repo, guide="guides/g"):
-    html = (repo.root / f"{guide}.html").read_text()
+    html = (repo.root / f"{guide}.html").read_text(encoding="utf-8")
     m = re.search(r'<script id="guide-data" type="application/json">(.*?)</script>', html, re.S)
     return json.loads(m.group(1))
 
@@ -343,7 +343,7 @@ class BuildTest(unittest.TestCase):
 
         self.build(guide)
 
-        mr = (self.repo.root / "guides/g.mr.md").read_text()
+        mr = (self.repo.root / "guides/g.mr.md").read_text(encoding="utf-8")
         self.assertIn("1. `src/**` *read*", mr)
         self.assertIn("- [ ] Voids resolve forward", mr)
         self.assertNotIn("Fold is pure", mr)
@@ -355,7 +355,7 @@ class BuildTest(unittest.TestCase):
 
         self.build(guide)
 
-        mr = (self.repo.root / "guides/g.mr.md").read_text()
+        mr = (self.repo.root / "guides/g.mr.md").read_text(encoding="utf-8")
         self.assertIn("## Split plan", mr)
         self.assertIn("1. **Fold in place** (behaviour, Ask, ~2 lines to read): the fold. Merges with: the V4 migration.", mr)
 
