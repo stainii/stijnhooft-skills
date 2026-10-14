@@ -22,14 +22,16 @@ scripts do the mechanical work, so spend your tokens on the *why*:
 - `scripts/build.py` checks your `guide.json` against the code, pastes in the real hunks, and
   renders the page and the MR text.
 
-Run both with `python3`, from the repo root, by their path in this skill's folder.
+Run both with `python3`, from the repo root, by their path in this skill's folder. On Windows,
+`python3` can point to the Microsoft Store stub: use `py -3` there.
 
 ## 1. Pick the scope
 
 - `session`: the changes made in this session. Pass `--base <sha>`, the commit HEAD was on when the
   session started (from the conversation, or `git reflog`). Name: `<branch>--<YYYY-MM-DD-HHMM>`.
 - `ticket`: the branch since its merge-base with the default branch. Pass `--ticket`. Name:
-  `<branch>`.
+  `<branch>`. A branch built on another feature branch is compared with that branch:
+  `--against <branch>`.
 - No argument: ask which.
 
 The guide is the folder `.claude/session-guides/<name>/` (slashes in the name become `-`). Confirm
@@ -38,11 +40,18 @@ where to write before going on.
 
 ## 2. Gather
 
-Run `gather.py .claude/session-guides/<name> <--base <sha> | --ticket>`, adding `--reviewed <sha>`
+Run `gather.py .claude/session-guides/<name> <--base <sha> | --ticket | --against <branch>>`, adding `--reviewed <sha>`
 with the last sha in `.claude/session-guides/<branch>.reviewed` when that file exists. It writes
-`facts.json` and prints a summary: totals per tier, **LARGE** or not, the jobs, and for a small
-change the files to read. Work from the summary; `scripts/files.py <guide-dir> [--job N] [--tier T]`
-lists files when you need them.
+`facts.json` and prints a summary: the base, totals per tier, **LARGE** or not, the jobs, suggested
+groups, and for a small change the files to read. Work from the summary;
+`scripts/files.py <guide-dir> [--job N] [--tier T]` lists files when you need them.
+
+With `--ticket` the base is a guess (the merge-base with the default branch), so the summary says
+**UNCONFIRMED BASE** and holds back the jobs: a wrong base means a wrong scope, and every step on it
+is wasted. Ask the user "Compare with `<default branch>`?" in one line. If it also says
+**CHECK BASE**, the branch holds work from other branches: name them and ask "Compare with
+`<default branch>` or with `<branch>`?". Then run `gather.py` again with their answer:
+`--against <branch>`, or `--base <sha>` to keep the base it printed.
 
 Read code as **hunks, never the whole diff**: `git diff <base> -- <path>` for one file at a time,
 only for read-tier files and the contracts. A skim or skip file needs its path, not its lines.
@@ -51,6 +60,12 @@ Then the conversation: the ask, clarifications, every decision, dead ends, the u
 For `ticket` with an existing `guide.json`: its decisions and sessions log carry the earlier
 sessions' *why*, which is otherwise lost. Keep them. Use the repo's own records (ADRs,
 `CONTEXT.md`, glossary): their terms, and links to them.
+
+No conversation to draw from (a `ticket` whose sessions you did not see): the *why* lives in the
+ticket's folder, the ADRs and the commit messages. Read them, take each decision from there with
+`by: "you"`, and name the source in `why` ("from ADR-0012", "from the commit message of abc123").
+A decision the code shows but no record explains is not yours to invent: write what the code does,
+`alt: "unknown"`, and a review card asking the user why.
 
 If the summary says **LARGE**, follow [SUBAGENTS.md](SUBAGENTS.md) now: one subagent per job reads
 the code and writes a part; you read the parts.
@@ -94,7 +109,8 @@ tight and never paste diff text.
   refactoring with behaviour: the same work as a stack of smaller MRs in safe merge order, one kind
   of thing each.
 - **Groups**: files that need no explanation of their own (fixtures, tests that follow a rename,
-  generated code) as one group each, so one line explains many files.
+  generated code) as one group each, so one line explains many files. Start from the suggested
+  groups in the summary (docs, lockfiles); drop one when its files do need a word.
 
 When files were deleted, renamed, split or merged, also follow [REFACTORING.md](REFACTORING.md).
 
@@ -126,4 +142,5 @@ agent default has a review card.
 
 ## 5. Hand over
 
-Open the page (`open <path>`), then give the user its path and the open review cards in chat.
+Open the page (`open <path>` on macOS, `start "" <path>` on Windows, `xdg-open <path>` on Linux),
+then give the user its path and the open review cards in chat.

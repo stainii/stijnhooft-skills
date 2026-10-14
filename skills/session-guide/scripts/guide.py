@@ -12,24 +12,33 @@ PANEL_LINK = re.compile(r"\]\(#([\w-]+)\)")
 
 def load(guide_dir):
     """guide.json with every parts/*.json merged into it."""
-    guide = json.loads((guide_dir / "guide.json").read_text())
+    guide = json.loads((guide_dir / "guide.json").read_text(encoding="utf-8"))
     parts = guide_dir / "parts"
     for part in sorted(parts.glob("*.json")) if parts.is_dir() else []:
-        guide = merge(tag(json.loads(part.read_text()), f"parts/{part.name}"), guide)
+        guide = merge(tag(json.loads(part.read_text(encoding="utf-8")), f"parts/{part.name}"), guide)
     return guide
 
 
-def tag(node, origin_name):
+PATH_MAPS = {"files", "gone"}  # keyed by path: a "_from" key there would read as one more path
+
+
+def tag(node, origin_name, path_map=False):
     """Mark every object from a part with where it came from, so a problem names the file to fix."""
     if isinstance(node, dict):
-        return {**{k: tag(v, origin_name) for k, v in node.items()}, "_from": origin_name}
+        tagged = {k: tag(v, origin_name, k in PATH_MAPS) for k, v in node.items()}
+        return tagged if path_map else {**tagged, "_from": origin_name}
     if isinstance(node, list):
         return [tag(v, origin_name) for v in node]
     return node
 
 
+def part_of(item):
+    """The part an object came from, or None for guide.json."""
+    return item.get("_from") if isinstance(item, dict) else None
+
+
 def origin(item):
-    return f" ({item['_from']})" if isinstance(item, dict) and item.get("_from") else ""
+    return f" ({part_of(item)})" if part_of(item) else ""
 
 
 def merge(part, guide):
@@ -62,7 +71,7 @@ class Ref:
 
     def __init__(self, kind, where, text, panel, owner, in_stop=False):
         self.kind, self.text, self.panel, self.in_stop = kind, text, panel, in_stop
-        self.where = where + origin(owner)
+        self.where, self.part = where + origin(owner), part_of(owner)
         self.span = Span.parse(text)
 
 
@@ -98,24 +107,25 @@ def panel_ids(guide):
     return ids
 
 
-def panel_links(node, where=""):
-    """(where, id) for every link to a panel: [label](#id) in text, and every panel / see field."""
+def panel_links(node, where="", part=None):
+    """(where, id, part) for every link to a panel: [label](#id) in text, and every panel / see field."""
     if isinstance(node, dict):
+        part = part_of(node) or part
         for k, v in node.items():
             here = f"{where}.{k}" if where else k
             if k == "_from":
                 continue
             if k == "panel" and isinstance(v, str):
-                yield here, v
+                yield here, v, part
             elif k == "see" and isinstance(v, list):
-                yield from ((here, x) for x in v)
+                yield from ((here, x, part) for x in v)
             else:
-                yield from panel_links(v, here)
+                yield from panel_links(v, here, part)
     elif isinstance(node, list):
         for i, v in enumerate(node):
-            yield from panel_links(v, f"{where}[{i}]")
+            yield from panel_links(v, f"{where}[{i}]", part)
     elif isinstance(node, str):
-        yield from ((where, m) for m in PANEL_LINK.findall(node))
+        yield from ((where, m, part) for m in PANEL_LINK.findall(node))
 
 
 def glob(pattern):

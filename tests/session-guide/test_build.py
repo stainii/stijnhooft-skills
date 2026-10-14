@@ -22,7 +22,7 @@ def minimal(**overrides):
 
 
 def page_data(repo, guide="guides/g"):
-    html = (repo.root / f"{guide}.html").read_text()
+    html = (repo.root / f"{guide}.html").read_text(encoding="utf-8")
     m = re.search(r'<script id="guide-data" type="application/json">(.*?)</script>', html, re.S)
     return json.loads(m.group(1))
 
@@ -157,6 +157,82 @@ class BuildTest(unittest.TestCase):
 
         self.assertProblem(self.build(minimal()), "decision d7 (parts/billing.json): no hunks")
 
+    def test_a_part_may_override_files(self):
+        self.repo.write("src/billing/Invoice.java", lines(3, "invoice"))
+        self.repo.write_part("job-1", {"files": {"src/billing/Invoice.java": {"panel": "d1"}},
+                                       "readOrder": [{"tier": "read", "files": ["src/billing/**"], "why": "w"}]})
+
+        r = self.build(minimal())
+
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_part_may_give_the_reason_a_file_is_gone(self):
+        guide = self.refactor()
+        self.repo.write_part("job-1", {"refactoring": {"gone": {"src/app/Old.java": "nobody calls it"}}})
+
+        r = self.build(guide)
+
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(page_data(self.repo)["refactoring"]["gone"], {"src/app/Old.java": "nobody calls it"})
+
+    def build_part(self, guide, part, job=1):
+        self.repo.gather("--base", self.base)
+        self.repo.write_guide(guide)
+        self.repo.write_part(f"job-{job}", part)
+        return self.repo.run("build.py", str(self.repo.root / "guides/g"), "--part", f"parts/job-{job}.json")
+
+    def test_a_part_can_be_checked_before_the_guide_is_complete(self):
+        guide = {"decisions": [{"id": "d1", "title": "Fold", "door": "two-way", "by": "you", "why": "w",
+                                "alt": "none considered", "hunks": []}]}
+        part = {k: minimal()[k] for k in ("flows", "readOrder")}
+
+        r = self.build_part(guide, part)
+
+        self.assertEqual(r.stdout.strip(), f"ok {self.repo.root.resolve() / 'guides/g/parts/job-1.json'}", r.stderr)
+        self.assertFalse((self.repo.root / "guides/g.html").exists())
+
+    def test_checking_a_part_prints_its_own_problems(self):
+        part = {"flows": [{"title": "F", "stops": [{"id": "w9", "at": "src/app/Service.java", "title": "t",
+                                                    "text": "see [it](#nowhere)"}]}]}
+
+        r = self.build_part({}, part)
+
+        self.assertEqual(r.stdout.splitlines(), [
+            "stop w9 (parts/job-1.json): 'src/app/Service.java' needs line numbers: path:line or path:from-to",
+            "src/app/Service.java: changed, but no stop, decision, contract, card or group explains it",
+            "src/app/Service.java: read tier, but not in readOrder",
+            "flows[0].stops[0].text (parts/job-1.json): links to #nowhere, which is not a panel",
+        ])
+
+    def test_checking_a_part_leaves_out_the_problems_of_other_jobs_and_of_guide_json(self):
+        self.repo.write("src/billing/Invoice.java", lines(1600, "invoice"))  # a job of its own
+        guide = {"decisions": [{"id": "d1", "title": "Fold", "door": "two-way", "by": "you", "why": "w",
+                                "alt": "none considered", "hunks": []}]}
+
+        own = self.build_part(guide, {k: minimal()[k] for k in ("flows", "readOrder")}, job=1)
+        other = self.build_part(guide, {}, job=2)
+
+        self.assertEqual(own.returncode, 0, own.stdout)
+        self.assertEqual(other.stdout.splitlines(), [
+            "src/billing/Invoice.java: changed, but no stop, decision, contract, card or group explains it"])
+
+    def test_checking_a_part_that_does_not_exist_says_so(self):
+        self.repo.gather("--base", self.base)
+        self.repo.write_guide(minimal())
+
+        r = self.repo.run("build.py", str(self.repo.root / "guides/g"), "--part", "parts/job-1.json")
+
+        part = self.repo.root.resolve() / "guides/g/parts/job-1.json"
+        self.assertEqual((r.returncode, r.stderr.strip()), (1, f"build.py: no part {part}"))
+
+    def test_problems_print_in_utf8_whatever_the_console_encoding(self):
+        self.repo.gather("--base", self.base)
+        self.repo.write_guide(minimal(evidence={"test": "src/app/Pijl→.java", "notCovered": "é"}))
+
+        r = self.repo.run("build.py", str(self.repo.root / "guides/g"), env={"PYTHONIOENCODING": "cp1252"})
+
+        self.assertIn("evidence: 'src/app/Pijl→.java' needs line numbers", r.stdout, r.stderr)
+
     def test_the_review_size_counts_lines_per_tier_after_the_guides_overrides(self):
         self.repo.write("src/app/Mapper.java", lines(30, "mapper"))
         guide = minimal(files={"src/app/Mapper.java": {"tier": "skim", "panel": "d1"}})
@@ -267,7 +343,7 @@ class BuildTest(unittest.TestCase):
 
         self.build(guide)
 
-        mr = (self.repo.root / "guides/g.mr.md").read_text()
+        mr = (self.repo.root / "guides/g.mr.md").read_text(encoding="utf-8")
         self.assertIn("1. `src/**` *read*", mr)
         self.assertIn("- [ ] Voids resolve forward", mr)
         self.assertNotIn("Fold is pure", mr)
@@ -279,7 +355,7 @@ class BuildTest(unittest.TestCase):
 
         self.build(guide)
 
-        mr = (self.repo.root / "guides/g.mr.md").read_text()
+        mr = (self.repo.root / "guides/g.mr.md").read_text(encoding="utf-8")
         self.assertIn("## Split plan", mr)
         self.assertIn("1. **Fold in place** (behaviour, Ask, ~2 lines to read): the fold. Merges with: the V4 migration.", mr)
 

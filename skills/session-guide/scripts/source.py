@@ -75,7 +75,7 @@ class Source:
     def text(self, path, at_base=False):
         """The file's lines now (or at the base); None when it doesn't exist there."""
         if not at_base and (self.root / path).is_file():
-            return (self.root / path).read_text(errors="replace").splitlines()
+            return (self.root / path).read_text(encoding="utf-8", errors="replace").splitlines()
         try:
             return git("show", f"{self.base}:{path}", cwd=self.root).splitlines()
         except subprocess.CalledProcessError:

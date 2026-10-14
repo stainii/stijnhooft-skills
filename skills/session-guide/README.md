@@ -97,7 +97,7 @@ Run the skill yourself at the end of a session, before you close the conversatio
 | Command | What it does |
 |---|---|
 | `/session-guide session` | A guide to what changed in this session |
-| `/session-guide ticket` | A guide to the whole branch, over all sessions |
+| `/session-guide ticket` | A guide to the whole branch, over all sessions. If your branch builds on another feature branch, the skill asks which branch to compare with |
 | `/session-guide mr` | The text for your merge request |
 | `/session-guide reviewed` | Remembers which version the reviewers have seen. This is a local file; it is never pushed |
 | `/session-guide quiz` | 3 to 5 questions, one at a time, to check that you understand the change |
@@ -146,8 +146,9 @@ the code.
 
 ## How to install
 
-You need the [`skills`](https://github.com/vercel-labs/skills) tool, `git`, and `python3`. This
-command installs the skill for all your projects:
+You need the [`skills`](https://github.com/vercel-labs/skills) tool, `git`, and `python3`. On
+Windows, use `py -3` if `python3` opens the Microsoft Store. This command installs the skill for
+all your projects:
 
 ```bash
 npx skills add stainii/stijnhooft-skills --skill session-guide -g
