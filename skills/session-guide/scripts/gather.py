@@ -51,8 +51,9 @@ def snapshot(root, exclude=None):
 
 
 # First guesses only; the agent overrides any of them in guide.json.
+LOCKFILE = re.compile(r"(^|/)(package-lock\.json|pnpm-lock\.yaml|go\.sum)$|\.lock$")
 GENERATED = re.compile(r"(^|/)(generated|gen|dist|build|target|vendor|node_modules|__snapshots__)/"
-                       r"|\.(min\.js|map|snap|lock)$|(^|/)(package-lock\.json|[^/]+-lock\.json|pnpm-lock\.yaml|go\.sum)$")
+                       r"|\.(min\.js|map|snap)$")
 TEST = re.compile(r"(^|/)(tests?|__tests__|spec|testdata|fixtures?)/|(Test|Tests|IT|Spec)\.\w+$"
                   r"|[._-](test|spec)\.\w+$|(^|/)test_[^/]+$|_test\.\w+$")
 SKIM = re.compile(r"\.(md|adoc|rst|txt|ya?ml|json|toml|properties|ini|xml|gradle|cfg|conf)$"
@@ -62,7 +63,7 @@ SKIM = re.compile(r"\.(md|adoc|rst|txt|ya?ml|json|toml|properties|ini|xml|gradle
 def tier(f):
     """read (logic), skim (tests, DTOs, config, docs), skip (generated, deleted, moved unchanged)."""
     p = f["path"]
-    if f["status"] == "D" or f.get("binary") or GENERATED.search(p) \
+    if f["status"] == "D" or f.get("binary") or GENERATED.search(p) or LOCKFILE.search(p) \
             or (f["status"] in "RC" and f["add"] == f["del"] == 0):
         return "skip"
     if TEST.search(p) or SKIM.search(p):
@@ -136,6 +137,14 @@ def jobs(files):
     return packed
 
 
+def job_files(facts, n):
+    """The files of job n, numbered from 1 as the summary prints them."""
+    if not 0 < n <= len(facts["jobs"]):
+        sys.exit(f"no job {n}: the summary lists {len(facts['jobs'])}")
+    modules = set(facts["jobs"][n - 1]["modules"])
+    return [f for f in facts["files"] if f["module"] in modules]
+
+
 def changed_files(base, cwd, env):
     """Every file that differs between <base> and the working tree, as the snapshot index sees it."""
     counts = dict(_numstat(base, cwd, env))
@@ -206,29 +215,65 @@ def default_branch(root):
     sys.exit("gather.py: no default branch found (origin/HEAD, main, master, develop); pass --base")
 
 
-def stacked_on(base, root):
-    """Other branches whose tip lies between the base and HEAD: this branch builds on them, so comparing with the
-    base would take their work in too."""
-    head = git("rev-parse", "HEAD", cwd=root).strip()
-    out = git("for-each-ref", "--merged", "HEAD", "--no-merged", base, "--format=%(objectname) %(refname:short)",
-              "refs/heads", "refs/remotes", cwd=root)
-    names = (line.split(" ", 1) for line in out.splitlines())
-    return sorted({name for sha, name in names if sha != head and not name.endswith("/HEAD")})
+def is_ancestor(a, b, root):
+    return git_succeeds("merge-base", "--is-ancestor", a, b, cwd=root)
+
+
+def rev(name, root):
+    """The sha a name points at, or None."""
+    try:
+        return git("rev-parse", "--verify", "-q", name, cwd=root).strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def other_work(base, against, root):
+    """Work from other branches between the base and HEAD, which the change would wrongly take in: a branch this one
+    builds on (its fork point with HEAD lies past the base), or a merge of commits the base does not hold. This
+    branch with its remote copies, the compared branch, a branch built on top of HEAD, and a pull from the upstream
+    do not count."""
+    head, up = rev("HEAD", root), rev("@{upstream}", root)
+    remotes = set(git("remote", cwd=root).split())
+
+    def branch(ref):  # origin/feature/a and feature/a are one branch
+        remote, _, rest = ref.partition("/")
+        return rest if remote in remotes and rest else ref
+
+    skip = branch(against)
+    refs = git("for-each-ref", "--no-merged", base, "--format=%(objectname) %(refname:short) %(refname:rstrip=-2)",
+               "refs/heads", "refs/remotes", cwd=root).split()
+    rows = list(zip(refs[0::3], refs[1::3], refs[2::3]))
+    local = {name for _, name, kind in rows if kind == "refs/heads"}
+    parents = {}
+    for sha, name, kind in rows:
+        if sha == head or name.endswith("/HEAD") or branch(name) == skip \
+                or (kind == "refs/remotes" and branch(name) in local):
+            continue
+        fork = git("merge-base", sha, "HEAD", cwd=root).strip()
+        if fork != head and not is_ancestor(fork, base, root):
+            parents[name] = sha
+    merges = []
+    for line in git("log", "--merges", "--format=%H %P", f"{base}..HEAD", cwd=root).splitlines():
+        merge, _, *merged = line.split()
+        if any(not is_ancestor(p, base, root) and not (up and is_ancestor(p, up, root))
+               and not any(is_ancestor(p, tip, root) for tip in parents.values()) for p in merged):
+            merges.append(f"merge {merge[:12]} ({git('log', '-1', '--format=%s', merge, cwd=root).strip()})")
+    return sorted(parents) + merges
 
 
 SUGGESTED_GROUPS = [  # files that rarely need a word of their own
     ("Docs", "skim", re.compile(r"^docs?/"), lambda p: p.split("/", 1)[0] + "/**"),
-    ("Lockfiles", "skip", re.compile(r"(^|/)([^/]+-lock\.json|pnpm-lock\.yaml|go\.sum|[^/]+\.lock)$"),
+    ("Lockfiles", "skip", LOCKFILE,
      lambda p: "**/" + p.rsplit("/", 1)[-1]),
 ]
 
 
 def suggested_groups(files):
     out = []
-    for name, tier_name, rx, pattern in SUGGESTED_GROUPS:
+    for name, group_tier, rx, pattern in SUGGESTED_GROUPS:
         match = sorted({pattern(f["path"]) for f in files if rx.search(f["path"])})
         if match:
-            out.append({"name": name, "match": match, "tier": tier_name})
+            out.append({"name": name, "match": match, "tier": group_tier})
     return out
 
 
@@ -266,7 +311,7 @@ def main(argv=None):
     scope = ap.add_mutually_exclusive_group(required=True)
     scope.add_argument("--base", help="session scope: the commit the session started from")
     scope.add_argument("--ticket", action="store_true", help="the branch since its merge-base with the default branch")
-    scope.add_argument("--against", help="the branch since its merge-base with this branch: for a branch built on another")
+    scope.add_argument("--against", help="the branch since its merge-base with this one: for a branch built on another")
     ap.add_argument("--reviewed", help="the sha last marked reviewed: adds the since-last-review rows")
     args = ap.parse_args(argv)
     out = Path(args.guide_dir)
@@ -277,8 +322,9 @@ def main(argv=None):
     with snapshot(root, guides_folder(out, root)) as env:
         facts = collect(args.base, root, env)
     facts["against"] = against
-    if args.ticket:
-        facts["stackedOn"] = stacked_on(args.base, root)
+    if against:
+        facts["otherWork"] = other_work(args.base, against, root)
+    facts["confirmed"] = not args.ticket
     if args.reviewed:
         facts["since"] = since(args.base, args.reviewed, root)
     out.mkdir(parents=True, exist_ok=True)
@@ -288,24 +334,26 @@ def main(argv=None):
 
 
 def summary(facts, path):
-    """What the agent needs to plan, in a few lines; the full list stays in facts.json."""
+    """What the agent needs to plan, in a few lines; the full list stays in facts.json.
+
+    The default branch is a guess at the base, so --ticket shows no jobs: a wrong base means a wrong scope, and every
+    subagent started on it is wasted. The agent confirms the base and runs again with --base or --against."""
     t, files = facts["totals"], facts["files"]
     count = lambda st: sum(f["status"] == st for f in files)
-    base = f"base {facts['base'][:12]}" + (f" (merge-base with {facts['against']})" if facts.get("against") else "")
-    stacked = facts.get("stackedOn")
-    if stacked:
-        # a wrong base means a wrong scope: no jobs until the user has confirmed it
-        return "\n".join([
-            f"{path}", base,
-            f"CHECK BASE: this branch builds on {', '.join(stacked)}. Ask the user what to compare with, then run again "
-            f"with --against <branch>, or with --base {facts['base'][:12]} to keep this base.",
-            f"{t['files']} files, +{t['add']} -{t['del']} with this base"])
-    lines = [f"{path}", base,
-             f"{t['files']} files, +{t['add']} -{t['del']} · read {t['read']} · skim {t['skim']} · skip {t['skip']}"
-             + (" · LARGE" if facts["large"] else ""),
-             f"added {count('A')} · deleted {count('D')} · renamed {count('R')} · copied {count('C')}",
-             "jobs (one subagent each in large mode): " + " | ".join(
-                 f"{i}: {j['read']} read lines in {', '.join(j['modules'])}" for i, j in enumerate(facts["jobs"], 1))]
+    base = facts["base"][:12]
+    lines = [f"{path}", f"base {base}" + (f" (merge-base with {facts['against']})" if facts.get("against") else "")]
+    if facts.get("otherWork"):
+        lines.append(f"CHECK BASE: holds work from other branches: {'; '.join(facts['otherWork'])}. Ask the user what "
+                     f"to compare with.")
+    lines += [f"{t['files']} files, +{t['add']} -{t['del']} · read {t['read']} · skim {t['skim']} · skip {t['skip']}"
+              + (" · LARGE" if facts["large"] else ""),
+              f"added {count('A')} · deleted {count('D')} · renamed {count('R')} · copied {count('C')}"]
+    if not facts["confirmed"]:
+        lines.append(f"UNCONFIRMED BASE: confirm it with the user, then run again with --base {base} or --against "
+                     f"<branch>; the jobs and the files to read follow then.")
+        return "\n".join(lines)
+    lines.append("jobs (one subagent each in large mode): " + " | ".join(
+        f"{i}: {j['read']} read lines in {', '.join(j['modules'])}" for i, j in enumerate(facts["jobs"], 1)))
     if facts.get("groups"):
         lines.append("suggested groups: " + json.dumps(facts["groups"]))
     if not facts["large"]:

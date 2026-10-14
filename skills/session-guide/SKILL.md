@@ -40,16 +40,18 @@ where to write before going on.
 
 ## 2. Gather
 
-Run `gather.py .claude/session-guides/<name> <--base <sha> | --ticket>`, adding `--reviewed <sha>`
+Run `gather.py .claude/session-guides/<name> <--base <sha> | --ticket | --against <branch>>`, adding `--reviewed <sha>`
 with the last sha in `.claude/session-guides/<branch>.reviewed` when that file exists. It writes
 `facts.json` and prints a summary: the base, totals per tier, **LARGE** or not, the jobs, suggested
-groups, and for a small change the files to read.
+groups, and for a small change the files to read. Work from the summary;
+`scripts/files.py <guide-dir> [--job N] [--tier T]` lists files when you need them.
 
-If the summary says **CHECK BASE**, the branch builds on other branches and the scope may be wrong.
-Stop and ask the user: "Compare with `<default branch>` or with `<branch>`?" Run `gather.py` again
-with their answer (`--against <branch>`, or `--base <sha>` to keep the base it printed). Nothing
-else happens on an unconfirmed base: a wrong scope wastes every step after it. Work from the summary; `scripts/files.py <guide-dir> [--job N] [--tier T]`
-lists files when you need them.
+With `--ticket` the base is a guess (the merge-base with the default branch), so the summary says
+**UNCONFIRMED BASE** and holds back the jobs: a wrong base means a wrong scope, and every step on it
+is wasted. Ask the user "Compare with `<default branch>`?" in one line. If it also says
+**CHECK BASE**, the branch holds work from other branches: name them and ask "Compare with
+`<default branch>` or with `<branch>`?". Then run `gather.py` again with their answer:
+`--against <branch>`, or `--base <sha>` to keep the base it printed.
 
 Read code as **hunks, never the whole diff**: `git diff <base> -- <path>` for one file at a time,
 only for read-tier files and the contracts. A skim or skip file needs its path, not its lines.
@@ -65,8 +67,7 @@ ticket's folder, the ADRs and the commit messages. Read them, take each decision
 A decision the code shows but no record explains is not yours to invent: write what the code does,
 `alt: "unknown"`, and a review card asking the user why.
 
-If the summary says **LARGE**, tell the user the base and the number of jobs, and wait for their
-yes before you follow [SUBAGENTS.md](SUBAGENTS.md): one subagent per job reads
+If the summary says **LARGE**, follow [SUBAGENTS.md](SUBAGENTS.md) now: one subagent per job reads
 the code and writes a part; you read the parts.
 
 Done when you can name, for every read-tier file, the stop, decision, contract or card it belongs
@@ -141,4 +142,5 @@ agent default has a review card.
 
 ## 5. Hand over
 
-Open the page (`open <path>` on macOS, `start "" <path>` on Windows, `xdg-open <path>` on Linux), then give the user its path and the open review cards in chat.
+Open the page (`open <path>` on macOS, `start "" <path>` on Windows, `xdg-open <path>` on Linux),
+then give the user its path and the open review cards in chat.

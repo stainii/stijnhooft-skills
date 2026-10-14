@@ -195,30 +195,111 @@ class GatherTest(unittest.TestCase):
 
         self.assertEqual((facts["base"], list(by_path(facts))), (self.base, ["src/app/Feature.java"]))
 
-    def stack_two_feature_branches(self):
-        self.repo.git("checkout", "-q", "-b", "feature-a")
-        self.repo.write("src/app/A.java", lines(2, "a"))
-        self.repo.commit()
-        self.repo.git("checkout", "-q", "-b", "feature-b")
-        self.repo.write("src/app/B.java", lines(2, "b"))
-        self.repo.commit()
+    def branch(self, name, *files):
+        self.repo.git("checkout", "-q", "-b", name)
+        for f in files:
+            self.repo.write(f"src/app/{f}.java", lines(2, f))
+        return self.repo.commit(name)
 
-    def test_ticket_scope_on_a_branch_built_on_another_asks_to_check_the_base_before_planning_jobs(self):
-        self.stack_two_feature_branches()
+    def ticket(self):
+        return self.repo.run("gather.py", str(self.repo.root / "guides/g"), "--ticket").stdout
 
-        out = self.repo.run("gather.py", str(self.repo.root / "guides/g"), "--ticket").stdout
+    def other_work(self, *args):
+        return self.repo.gather(*args)["otherWork"]
+
+    def test_ticket_scope_names_its_base_and_holds_back_the_jobs_until_the_base_is_confirmed(self):
+        self.branch("feature", "F")
+
+        out = self.ticket()
 
         self.assertIn(f"base {self.base[:12]} (merge-base with main)", out)
-        self.assertIn("CHECK BASE: this branch builds on feature-a.", out)
-        self.assertNotIn("jobs", out)
+        self.assertIn(f"UNCONFIRMED BASE: confirm it with the user, then run again with --base {self.base[:12]}", out)
+        self.assertNotIn("jobs (one subagent", out)
+        self.assertNotIn("CHECK BASE", out)
+
+    def test_a_confirmed_base_lists_the_jobs(self):
+        self.branch("feature", "F")
+
+        out = self.repo.run("gather.py", str(self.repo.root / "guides/g"), "--base", self.base).stdout
+
+        self.assertIn("jobs (one subagent each in large mode): 1: 2 read lines in app", out)
+
+    def test_a_branch_built_on_another_feature_branch_asks_to_check_the_base(self):
+        self.branch("feature-a", "A")
+        self.branch("feature-b", "B")
+
+        self.assertIn("CHECK BASE: holds work from other branches: feature-a.", self.ticket())
+
+    def test_a_parent_branch_that_moved_on_after_the_fork_still_counts(self):
+        self.branch("feature-a", "A")
+        self.branch("feature-b", "B")
+        self.repo.git("checkout", "-q", "feature-a")
+        self.repo.write("src/app/A2.java", lines(2, "a2"))
+        self.repo.commit()
+        self.repo.git("checkout", "-q", "feature-b")
+
+        self.assertEqual(self.other_work("--ticket"), ["feature-a"])
+
+    def test_a_merged_branch_that_was_deleted_counts_by_its_merge(self):
+        self.branch("feature-a", "A")
+        self.repo.git("checkout", "-q", "main")
+        self.branch("feature-b", "B")
+        self.repo.git("merge", "-q", "--no-ff", "-m", "Merge feature-a", "feature-a")
+        self.repo.git("branch", "-q", "-D", "feature-a")
+        merge = self.repo.git("rev-parse", "HEAD")
+
+        self.assertEqual(self.other_work("--ticket"), [f"merge {merge[:12]} (Merge feature-a)"])
+
+    def test_its_own_upstream_behind_head_does_not_count(self):
+        pushed = self.branch("feature", "F")
+        self.repo.write("src/app/G.java", lines(2, "g"))
+        self.repo.commit()
+        self.repo.track("feature", pushed)
+
+        self.assertEqual(self.other_work("--ticket"), [])
+
+    def test_pulling_its_own_upstream_does_not_count(self):
+        self.branch("feature", "F")
+        self.branch("pushed-by-a-colleague", "P")
+        self.repo.git("checkout", "-q", "feature")
+        self.repo.track("feature", self.repo.git("rev-parse", "pushed-by-a-colleague"))
+        self.repo.git("branch", "-q", "-D", "pushed-by-a-colleague")
+        self.repo.write("src/app/G.java", lines(2, "g"))
+        self.repo.commit()
+        self.repo.git("merge", "-q", "--no-ff", "-m", "Merge origin/feature", "origin/feature")
+
+        self.assertEqual(self.other_work("--ticket"), [])
+
+    def test_a_branch_built_on_top_of_this_one_does_not_count(self):
+        self.branch("feature", "F")
+        self.branch("feature-child", "C")
+        self.repo.git("checkout", "-q", "feature")
+
+        self.assertEqual(self.other_work("--ticket"), [])
 
     def test_against_a_branch_compares_with_its_merge_base(self):
-        self.stack_two_feature_branches()
+        self.branch("feature-a", "A")
+        self.branch("feature-b", "B")
 
         facts = self.repo.gather("--against", "feature-a")
 
-        self.assertEqual(list(by_path(facts)), ["src/app/B.java"])
-        self.assertNotIn("stackedOn", facts)
+        self.assertEqual((list(by_path(facts)), facts["otherWork"]), (["src/app/B.java"], []))
+
+    def test_against_a_branch_still_finds_work_from_a_branch_in_between(self):
+        self.branch("feature-a", "A")
+        self.branch("feature-b", "B")
+        self.branch("feature-c", "C")
+
+        self.assertEqual(self.other_work("--against", "feature-a"), ["feature-b"])
+
+    def test_the_summary_prints_in_utf8_whatever_the_console_encoding(self):
+        self.repo.write("src/app/Pijl→.java", lines(2))
+
+        r = self.repo.run("gather.py", str(self.repo.root / "guides/g"), "--base", self.base,
+                          env={"PYTHONIOENCODING": "cp1252"})
+
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("read: src/app/Pijl→.java", r.stdout)
 
     def test_suggests_a_group_for_docs_and_one_for_lockfiles(self):
         self.repo.write("docs/adr/0001-x.md", lines(2))
@@ -266,6 +347,14 @@ class GatherTest(unittest.TestCase):
         out = self.repo.run("files.py", str(self.repo.root / "guides/g"), "--job", "2").stdout
 
         self.assertEqual(out.splitlines(), ["read A +400 -0 src/b/B.java", "skim A +4 -0 src/b/BTest.java"])
+
+    def test_listing_a_job_that_does_not_exist_says_so(self):
+        self.repo.write("src/a/A.java", lines(2, "a"))
+        self.repo.gather("--base", self.base)
+
+        r = self.repo.run("files.py", str(self.repo.root / "guides/g"), "--job", "3")
+
+        self.assertEqual((r.returncode, r.stderr.strip()), (1, "no job 3: the summary lists 1"))
 
 
 if __name__ == "__main__":

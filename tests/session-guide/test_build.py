@@ -164,13 +164,22 @@ class BuildTest(unittest.TestCase):
 
         r = self.build(minimal())
 
-        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
-    def build_part(self, guide, part):
+    def test_a_part_may_give_the_reason_a_file_is_gone(self):
+        guide = self.refactor()
+        self.repo.write_part("job-1", {"refactoring": {"gone": {"src/app/Old.java": "nobody calls it"}}})
+
+        r = self.build(guide)
+
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(page_data(self.repo)["refactoring"]["gone"], {"src/app/Old.java": "nobody calls it"})
+
+    def build_part(self, guide, part, job=1):
         self.repo.gather("--base", self.base)
         self.repo.write_guide(guide)
-        self.repo.write_part("job-1", part)
-        return self.repo.run("build.py", str(self.repo.root / "guides/g"), "--part", "parts/job-1.json")
+        self.repo.write_part(f"job-{job}", part)
+        return self.repo.run("build.py", str(self.repo.root / "guides/g"), "--part", f"parts/job-{job}.json")
 
     def test_a_part_can_be_checked_before_the_guide_is_complete(self):
         guide = {"decisions": [{"id": "d1", "title": "Fold", "door": "two-way", "by": "you", "why": "w",
@@ -179,15 +188,50 @@ class BuildTest(unittest.TestCase):
 
         r = self.build_part(guide, part)
 
-        self.assertEqual(r.returncode, 0, r.stdout)
-        self.assertTrue(r.stdout.startswith("ok ") and r.stdout.strip().endswith("guides/g/parts/job-1.json"), r.stdout)
+        self.assertEqual(r.stdout.strip(), f"ok {self.repo.root.resolve() / 'guides/g/parts/job-1.json'}", r.stderr)
         self.assertFalse((self.repo.root / "guides/g.html").exists())
 
-    def test_checking_a_part_prints_its_problems(self):
-        part = {"flows": [{"title": "F", "stops": [{"id": "w9", "at": "src/app/Service.java", "title": "t", "text": "t"}]}]}
+    def test_checking_a_part_prints_its_own_problems(self):
+        part = {"flows": [{"title": "F", "stops": [{"id": "w9", "at": "src/app/Service.java", "title": "t",
+                                                    "text": "see [it](#nowhere)"}]}]}
 
-        self.assertProblem(self.build_part({}, part),
-                           "stop w9 (parts/job-1.json): 'src/app/Service.java' needs line numbers")
+        r = self.build_part({}, part)
+
+        self.assertEqual(r.stdout.splitlines(), [
+            "stop w9 (parts/job-1.json): 'src/app/Service.java' needs line numbers: path:line or path:from-to",
+            "src/app/Service.java: changed, but no stop, decision, contract, card or group explains it",
+            "src/app/Service.java: read tier, but not in readOrder",
+            "flows[0].stops[0].text (parts/job-1.json): links to #nowhere, which is not a panel",
+        ])
+
+    def test_checking_a_part_leaves_out_the_problems_of_other_jobs_and_of_guide_json(self):
+        self.repo.write("src/billing/Invoice.java", lines(1600, "invoice"))  # a job of its own
+        guide = {"decisions": [{"id": "d1", "title": "Fold", "door": "two-way", "by": "you", "why": "w",
+                                "alt": "none considered", "hunks": []}]}
+
+        own = self.build_part(guide, {k: minimal()[k] for k in ("flows", "readOrder")}, job=1)
+        other = self.build_part(guide, {}, job=2)
+
+        self.assertEqual(own.returncode, 0, own.stdout)
+        self.assertEqual(other.stdout.splitlines(), [
+            "src/billing/Invoice.java: changed, but no stop, decision, contract, card or group explains it"])
+
+    def test_checking_a_part_that_does_not_exist_says_so(self):
+        self.repo.gather("--base", self.base)
+        self.repo.write_guide(minimal())
+
+        r = self.repo.run("build.py", str(self.repo.root / "guides/g"), "--part", "parts/job-1.json")
+
+        part = self.repo.root.resolve() / "guides/g/parts/job-1.json"
+        self.assertEqual((r.returncode, r.stderr.strip()), (1, f"build.py: no part {part}"))
+
+    def test_problems_print_in_utf8_whatever_the_console_encoding(self):
+        self.repo.gather("--base", self.base)
+        self.repo.write_guide(minimal(evidence={"test": "src/app/Pijl→.java", "notCovered": "é"}))
+
+        r = self.repo.run("build.py", str(self.repo.root / "guides/g"), env={"PYTHONIOENCODING": "cp1252"})
+
+        self.assertIn("evidence: 'src/app/Pijl→.java' needs line numbers", r.stdout, r.stderr)
 
     def test_the_review_size_counts_lines_per_tier_after_the_guides_overrides(self):
         self.repo.write("src/app/Mapper.java", lines(30, "mapper"))

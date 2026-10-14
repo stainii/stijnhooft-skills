@@ -32,8 +32,13 @@ def tag(node, origin_name, path_map=False):
     return node
 
 
+def part_of(item):
+    """The part an object came from, or None for guide.json."""
+    return item.get("_from") if isinstance(item, dict) else None
+
+
 def origin(item):
-    return f" ({item['_from']})" if isinstance(item, dict) and item.get("_from") else ""
+    return f" ({part_of(item)})" if part_of(item) else ""
 
 
 def merge(part, guide):
@@ -66,7 +71,7 @@ class Ref:
 
     def __init__(self, kind, where, text, panel, owner, in_stop=False):
         self.kind, self.text, self.panel, self.in_stop = kind, text, panel, in_stop
-        self.where = where + origin(owner)
+        self.where, self.part = where + origin(owner), part_of(owner)
         self.span = Span.parse(text)
 
 
@@ -102,24 +107,25 @@ def panel_ids(guide):
     return ids
 
 
-def panel_links(node, where=""):
-    """(where, id) for every link to a panel: [label](#id) in text, and every panel / see field."""
+def panel_links(node, where="", part=None):
+    """(where, id, part) for every link to a panel: [label](#id) in text, and every panel / see field."""
     if isinstance(node, dict):
+        part = part_of(node) or part
         for k, v in node.items():
             here = f"{where}.{k}" if where else k
             if k == "_from":
                 continue
             if k == "panel" and isinstance(v, str):
-                yield here, v
+                yield here, v, part
             elif k == "see" and isinstance(v, list):
-                yield from ((here, x) for x in v)
+                yield from ((here, x, part) for x in v)
             else:
-                yield from panel_links(v, here)
+                yield from panel_links(v, here, part)
     elif isinstance(node, list):
         for i, v in enumerate(node):
-            yield from panel_links(v, f"{where}[{i}]")
+            yield from panel_links(v, f"{where}[{i}]", part)
     elif isinstance(node, str):
-        yield from ((where, m) for m in PANEL_LINK.findall(node))
+        yield from ((where, m, part) for m in PANEL_LINK.findall(node))
 
 
 def glob(pattern):
